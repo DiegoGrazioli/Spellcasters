@@ -20,21 +20,22 @@ let circleRotation = 0;
 let mouseX = 0;
 let mouseY = 0;
 
-let erasing = false;
+canvas.addEventListener("contextmenu", (e) => {
+  e.preventDefault(); // evita il menu del browser
 
-canvas.addEventListener("mousedown", (e) => {
-  if (e.button === 2 && magicCircle) {
-    e.preventDefault();
-    erasing = true;
-    magicCircle.erasePoints = []; // Inizia a cancellare
-  }
-});
+  if (!magicCircle) return;
 
-canvas.addEventListener("mouseup", (e) => {
-  if (e.button === 2 && magicCircle) {
-    e.preventDefault();
-    erasing = false;
-    tryDeleteCircle();
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+
+  const dx = mx - magicCircle.x;
+  const dy = my - magicCircle.y;
+  const dist = Math.hypot(dx, dy);
+
+  if (dist >= magicCircle.radius && dist <= magicCircle.radius + 20) {
+    magicCircle = null; // cancellazione!
+    showDebugMessage("Cerchio magico cancellato");
   }
 });
 
@@ -161,9 +162,7 @@ function showEffect(type) {
       x: mousePos.x,
       y: mousePos.y,
       radius: 120,
-      thickness: 3,
-      erasePoints: [],
-      erasedFraction: 0
+      thickness: 3
     };
     return; // Niente particelle, termina qui
   }
@@ -338,21 +337,6 @@ function drawMagicCircle() {
       color: "rgba(255, 0, 255,", // fucsia
     });
   }
-
-  // === Erasing (non ruotato)
-  if (erasing) {
-    const step = 2 * Math.PI / 120;
-    for (let angle = 0; angle <= 2 * Math.PI; angle += step) {
-      const px = x + Math.cos(angle) * radius;
-      const py = y + Math.sin(angle) * radius;
-      const dx = mouseX - px;
-      const dy = mouseY - py;
-      const dist = Math.hypot(dx, dy);
-      if (dist < 10) {
-        magicCircle.erasePoints.push({ x: px, y: py });
-      }
-    }
-  }
 }
 
 
@@ -408,34 +392,4 @@ function drawTemplate(name, ctx) {
 function resizeCanvas() {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
-}
-
-function tryDeleteCircle() {
-  if (!magicCircle) return;
-
-  const erasedAngles = new Set();
-  const r = magicCircle.radius;
-  const x = magicCircle.x;
-  const y = magicCircle.y;
-  const step = 2 * Math.PI / 120;
-
-  for (let angle = 0; angle <= 2 * Math.PI; angle += step) {
-    const px = x + Math.cos(angle) * r;
-    const py = y + Math.sin(angle) * r;
-
-    const dx = mouseX - px;
-    const dy = mouseY - py;
-    const dist = Math.hypot(dx, dy);
-
-    if (dist < 10) {
-      const angleIndex = Math.floor(angle / step);
-      erasedAngles.add(angleIndex);
-    }
-  }
-
-  // Se cancellati più del 50% dei segmenti
-  const percent = erasedAngles.size / 120;
-  if (percent > 0.5) {
-    magicCircle = null;
-  }
 }
