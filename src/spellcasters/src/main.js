@@ -94,6 +94,27 @@ window.addEventListener("keyup", (e) => {
   }
 });
 
+let backgroundColor = '#ffffff'; // default giorno
+
+// Ripristina modalità da localStorage
+const savedMode = localStorage.getItem('mode');
+if (savedMode === 'night') {
+  backgroundColor = '#111111';
+} else if (savedMode === 'day') {
+  backgroundColor = '#ffffff';
+}
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'n' || e.key === 'N') {
+    backgroundColor = '#111111'; // notte
+    localStorage.setItem('mode', 'night');
+  }
+  if (e.key === 'g' || e.key === 'G') {
+    backgroundColor = '#ffffff'; // giorno
+    localStorage.setItem('mode', 'day');
+  }
+});
+
 function createParticle(x, y) {
   return {
     x,
@@ -254,7 +275,8 @@ function showEffect(type) {
 
 
 function animate() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = backgroundColor;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
   if (casting) drawPath();
   updateParticles();
   drawParticles();
@@ -264,7 +286,7 @@ function animate() {
   regenMana();
   requestAnimationFrame(animate);
   circleRotation += 0.003;
-  drawManaSegments(); // ora importata da manabar.js
+  drawManaSegments();
 }
 
 // PARTICELLE ELEMENTALI
