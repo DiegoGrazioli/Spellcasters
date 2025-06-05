@@ -1,4 +1,5 @@
 import DollarRecognizer from "./dollarRecognizer";
+import { drawManaSegments, setManaValues, getManaValues, setCurrentMana, getCurrentMana, getManaMax, getManaRecoverSpeed } from "./Manabar";
 
 const recognizer = new DollarRecognizer();
 
@@ -19,6 +20,9 @@ let circleRotation = 0;
 
 let mouseX = 0;
 let mouseY = 0;
+
+// === MANA SYSTEM ===
+// Usa solo il modulo manabar.js per gestire mana, manaMax, manaRecoverSpeed
 
 canvas.addEventListener("contextmenu", (e) => {
   e.preventDefault(); // evita il menu del browser
@@ -136,16 +140,17 @@ function drawPath() {
 
 function recognizeSpell(points) {
   if (points.length < 10) return null;
-  
   const result = recognizer.recognize(points);
-  
   // Soglia di confidenza
   if (result.score > 0.60) {
     showDebugMessage(`Simbolo riconosciuto: ${result.name} (${Math.round(result.score * 100)}% confidenza)`);
     showEffect(result.name);
+    // Consuma 1 mana SOLO se non è il cerchio magico
+    if (result.name !== "cerchio") {
+      spendMana(1);
+    }
     return result.name;
   }
-  
   showDebugMessage('Simbolo non riconosciuto', 1000);
   return null;
 }
@@ -256,13 +261,10 @@ function animate() {
   drawFireParticles();
   drawMagicParticles();
   drawMagicCircle();
+  regenMana();
   requestAnimationFrame(animate);
-  // drawTemplate("fuoco", ctx);
-  // drawTemplate("acqua", ctx);
-  // drawTemplate("aria", ctx);
-  // drawTemplate("terra", ctx);
-  // drawTemplate("cerchio", ctx);
   circleRotation += 0.003;
+  drawManaSegments(); // ora importata da manabar.js
 }
 
 // PARTICELLE ELEMENTALI
@@ -364,7 +366,6 @@ window.addEventListener("resize", resizeCanvas);
 
 function showDebugMessage(message, duration = 2000) {
   const debugBox = document.getElementById("debug");
-  debugBox.textContent = message;
   debugBox.classList.remove("hidden");
   debugBox.classList.add("visible");
 
@@ -396,3 +397,64 @@ function resizeCanvas() {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
 }
+
+// === MANA SYSTEM ===
+
+function updateManaBar() {
+  const manaBar = document.getElementById("mana-bar");
+  const inner = manaBar.querySelector(".mana-inner");
+  const percent = Math.max(0, Math.min(1, getCurrentMana() / getManaMax()));
+  if (inner) {
+    inner.style.width = `${percent * 100}%`;
+  }
+}
+
+function spendMana(amount) {
+  if (getManaValues().inBurnout) return false;
+  if (getCurrentMana() < amount) {
+    triggerBurnout();
+    return false;
+  }
+  setCurrentMana(getCurrentMana() - amount);
+  return true;
+}
+
+function triggerBurnout() {
+  let manaVals = getManaValues();
+  setManaValues({
+    burnout: true,
+    burnoutT: 300, // 5 secondi a 60fps
+    current: 0
+  });
+  showDebugMessage("Burnout! Mana esaurito.", 2000);
+}
+
+function regenMana() {
+  let { mana, manaMax, manaRecoverSpeed, inBurnout, burnoutTimer } = getManaValues();
+  if (!inBurnout && mana < manaMax) {
+    mana += manaRecoverSpeed;
+    if (mana > manaMax) mana = manaMax;
+  }
+  if (inBurnout) {
+    burnoutTimer--;
+    if (burnoutTimer <= 0) {
+      inBurnout = false;
+      mana = manaMax * 0.2; // riparti con il 20%
+    }
+  }
+  setManaValues({ max: manaMax, current: mana, regen: manaRecoverSpeed, burnout: inBurnout, burnoutT: burnoutTimer });
+}
+
+// Inizializza la barra del mana
+window.addEventListener("DOMContentLoaded", () => {
+  const manaBar = document.getElementById("mana-bar");
+  if (!manaBar.querySelector(".mana-inner")) {
+    const inner = document.createElement("div");
+    inner.className = "mana-inner";
+    inner.style.height = "100%";
+    inner.style.background = "linear-gradient(to right, cyan, blue)";
+    inner.style.width = `${(currentMana / maxMana) * 100}%`;
+    manaBar.appendChild(inner);
+  }
+  updateManaBar();
+});

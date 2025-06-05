@@ -23,22 +23,22 @@ body {
   cursor: crosshair;
 }
 
-#mana-bar {
-  position: fixed;
-  left: 0;
-  bottom: 0;
-  height: 10px;
-  width: 100%;
-  background: #444;
-  z-index: 10;
+:root {
+  --mana-bar-color: #00eaff;
 }
 
-#mana-bar::after {
-  content: "";
-  display: block;
-  height: 100%;
-  background: linear-gradient(to right, cyan, blue);
-  width: 60%; /* iniziale: 60% di mana */
+#mana-bar, #mana-bar .mana-inner {
+  display: none !important;
+}
+
+#mana-segments {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 200;
 }
 
 /* DEBUG */
