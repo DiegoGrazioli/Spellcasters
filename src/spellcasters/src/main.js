@@ -33,7 +33,7 @@ canvas.addEventListener("contextmenu", (e) => {
   const dy = my - magicCircle.y;
   const dist = Math.hypot(dx, dy);
 
-  if (dist >= magicCircle.radius && dist <= magicCircle.radius + 20) {
+  if (dist >= magicCircle.radius - 120 && dist <= magicCircle.radius) {
     magicCircle = null; // cancellazione!
     showDebugMessage("Cerchio magico cancellato");
   }
@@ -261,7 +261,7 @@ function animate() {
   // drawTemplate("acqua", ctx);
   // drawTemplate("aria", ctx);
   // drawTemplate("terra", ctx);
-  drawTemplate("cerchio", ctx);
+  // drawTemplate("cerchio", ctx);
   circleRotation += 0.003;
 }
 
@@ -282,7 +282,7 @@ function drawFireParticles() {
 }
 
 function drawMagicCircle() {
-   if (!magicCircle) return;
+  if (!magicCircle) return;
 
   const { x, y, radius, thickness } = magicCircle;
 
@@ -374,6 +374,7 @@ function showDebugMessage(message, duration = 2000) {
   }, duration);
 }
 
+// DEBUG
 
 function drawTemplate(name, ctx) {
   const template = recognizer.templates.find(t => t.name === name);
@@ -388,6 +389,8 @@ function drawTemplate(name, ctx) {
   ctx.lineWidth = 2;
   ctx.stroke();
 }
+
+// FINE DEBUG
 
 function resizeCanvas() {
   canvas.width = window.innerWidth;

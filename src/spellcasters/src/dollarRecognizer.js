@@ -65,6 +65,31 @@ export default class DollarRecognizer {
         {x: 90, y: 95}
     ]);
 
+    // rifletti orizzontalmente per creare una spirale in senso antiorario
+    this.addGesture('aria', [
+        {x: 110, y: 125},
+        {x: 90, y: 120},
+        {x: 80, y: 110},
+        {x: 80, y: 100},
+        {x: 85, y: 95},
+        {x: 90, y: 100},
+        {x: 90, y: 110},
+        {x: 80, y: 120},
+        {x: 60, y: 125}
+    ]);
+
+    // rifletti orizzontalmente per creare una spirale in senso antiorario
+    this.addGesture('aria', [
+        {x: 60, y: 125},
+        {x: 80, y: 120},
+        {x: 90, y: 110},
+        {x: 90, y: 100},
+        {x: 85, y: 95},
+        {x: 80, y: 100},
+        {x: 80, y: 110},
+        {x: 90, y: 120},
+        {x: 110, y: 125}
+    ]);
 
     // Template per Terra (quadrato)
     this.addGesture('terra', [
