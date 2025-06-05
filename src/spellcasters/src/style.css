@@ -103,14 +103,15 @@ button {
 button:before {
   content: '';
   position: absolute;
-  left: 50%;
-  top: 50%;
+  left: var(--mouse-x, 50%);
+  top: var(--mouse-y, 50%);
   width: 0;
   height: 0;
   background: radial-gradient(circle, #fff8 0%, #00eaff00 80%);
   transform: translate(-50%, -50%);
-  transition: width 0.4s, height 0.4s;
+  transition: width 0.4s, height 0.4s, left 0.1s, top 0.1s;
   z-index: 0;
+  pointer-events: none;
 }
 button:hover:before {
   width: 220%;
@@ -171,6 +172,10 @@ button:focus {
   margin: 15px;
 }
 
+.btn-permanent {
+  position: fixed;
+}
+
 /* Titolo con colore dinamico */
 #home-title {
   font-family: "Cinzel", serif;
@@ -191,4 +196,38 @@ body.day #home-title {
 
 /* Font per fantasy/futuristico */
 /* @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Orbitron:wght@600&display=swap'); */
+
+#login-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  /* background gestito via JS per tema */
+  transition: background 0.4s;
+}
+
+body.night #login-container {
+  background: rgba(30,30,40,0.95);
+}
+body.day #login-container {
+  background: rgba(255,255,255,0.92);
+}
+
+#login-form, #signup-form {
+  /* ...existing code... */
+}
+
+.login-label {
+  font-family: 'Cinzel', serif;
+  font-size: 1rem;
+  transition: color 0.4s;
+}
+body.night .login-label {
+  color: #00eaff;
+}
+body.day .login-label {
+  color: #7f5cff;
+}
 

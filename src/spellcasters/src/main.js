@@ -272,7 +272,8 @@ function animate() {
   regenMana();
   requestAnimationFrame(animate);
   circleRotation += 0.003;
-  drawManaSegments(); // ora importata da manabar.js
+  drawManaSegments();
+  drawTemplate('terra', ctx); // Disegna il template del fuoco per debug
 }
 
 // PARTICELLE ELEMENTALI
@@ -373,14 +374,14 @@ animate();
 window.addEventListener("resize", resizeCanvas);
 
 function showDebugMessage(message, duration = 2000) {
-  const debugBox = document.getElementById("debug");
-  debugBox.classList.remove("hidden");
-  debugBox.classList.add("visible");
+  // const debugBox = document.getElementById("debug");
+  // debugBox.classList.remove("hidden");
+  // debugBox.classList.add("visible");
 
-  setTimeout(() => {
-    debugBox.classList.remove("visible");
-    debugBox.classList.add("hidden");
-  }, duration);
+  // setTimeout(() => {
+  //   debugBox.classList.remove("visible");
+  //   debugBox.classList.add("hidden");
+  // }, duration);
 }
 
 // DEBUG

@@ -108,6 +108,24 @@ export default class DollarRecognizer {
         {x: 60, y: 80}   // Chiusura del quadrato
     ]);
 
+    this.addGesture('terra', [
+        {x: 40, y: 80},  // Inizio in alto a sinistra
+        {x: 110, y: 80}, // Spostamento a destra
+        {x: 120, y: 100}, // Spostamento in basso
+        {x: 100, y: 120}, // Spostamento a sinistra
+        {x: 80, y: 100},  // Spostamento in basso
+        {x: 80, y: 40}  // Spostamento in alto
+    ]);
+
+    this.addGesture('terra', [
+        {x: 80, y: 40},  // Inizio in alto a sinistra
+        {x: 80, y: 100}, // Spostamento a destra
+        {x: 100, y: 120}, // Spostamento in basso
+        {x: 120, y: 100}, // Spostamento a sinistra
+        {x: 110, y: 80},  // Spostamento in basso
+        {x: 40, y: 80}  // Spostamento in alto
+    ]);
+
     this.addGesture('cerchio', [
         {x: 100, y: 100}, // Inizio al centro
         {x: 120, y: 110}, // Spostamento a destra

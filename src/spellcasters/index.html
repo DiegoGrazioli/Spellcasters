@@ -1,16 +1,178 @@
 <!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="stylesheet" href="/src/style.css" />
-    <title>Spellcaster - Login</title>
-  </head>
-  <body>
-    <div id="mana-bar">
-      <div class="mana-inner"></div>
-    </div>
-    <canvas id="spellCanvas"></canvas>
-    <div id="debug" class="hidden">Debug info</div>
-    <script type="module" src="/src/main.js"></script>
-  </body>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="stylesheet" href="src/style.css" />
+  <title>Spellcaster - Login</title>
+  <style>
+    #login-container {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 32px;
+    }
+    #login-form, #signup-form {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-width: 260px;
+      border-radius: 1em;
+      box-shadow: 0 0 24px #7f5cff44;
+      padding: 32px 24px;
+      align-items: center;
+    }
+    #login-form input, #signup-form input {
+      font-size: 1.1rem;
+      padding: 0.5em 1em;
+      border-radius: 0.5em;
+      border: 1px solid #7f5cff55;
+      background: #181828;
+      color: #fff;
+      width: 200px;
+    }
+    #login-form label, #signup-form label {
+      align-self: flex-start;
+      font-size: 1rem;
+    }
+    #switch-link {
+      color: #00eaff;
+      cursor: pointer;
+      text-decoration: underline;
+      margin-top: 8px;
+      font-size: 1rem;
+    }
+    #login-error, #signup-error {
+      color: #ff5555;
+      font-size: 1rem;
+      min-height: 1.2em;
+    }
+    #theme-toggle-index {
+      position: fixed;
+      top: 18px;
+      right: 18px;
+      z-index: 1000;
+    }
+  </style>
+</head>
+<body>
+  <!-- <div id="theme-toggle-index"></div> -->
+  <div id="login-container">
+    <h1 id="home-title">Spellcasters</h1>
+    <form id="login-form">
+      <label for="login-username" class="login-label">Nome utente</label>
+      <input id="login-username" type="text" required autocomplete="username">
+      <label for="login-password" class="login-label">Password</label>
+      <input id="login-password" type="password" required autocomplete="current-password">
+      <div id="login-error"></div>
+      <button type="submit">Login</button>
+      <span id="switch-link">Non hai un account? Registrati</span>
+    </form>
+    <form id="signup-form" style="display:none;">
+      <label for="signup-username" class="login-label">Nome utente</label>
+      <input id="signup-username" type="text" required autocomplete="username">
+      <label for="signup-password" class="login-label">Password</label>
+      <input id="signup-password" type="password" required autocomplete="new-password">
+      <div id="signup-error"></div>
+      <button type="submit">Registrati</button>
+      <span id="switch-link2">Hai già un account? Login</span>
+    </form>
+  </div>
+  <script type="module">
+    import { createThemeToggle, initTheme, getTheme } from './src/theme.js';
+    initTheme();
+    // Aggiorna la classe del body per il tema
+    function updateBodyThemeClass() {
+      const theme = getTheme();
+      document.body.classList.remove('day', 'night');
+      document.body.classList.add(theme);
+    }
+    updateBodyThemeClass();
+    window.onThemeChange = updateBodyThemeClass;
+    // Pulsante tema in alto a destra
+    const themeToggle = createThemeToggle();
+    // document.getElementById('theme-toggle-index').appendChild(themeToggle);
+    // Disabilita cambio tema da tastiera se un input è attivo
+    window.addEventListener('keydown', (e) => {
+      const active = document.activeElement;
+      if ((e.key === 'n' || e.key === 'N' || e.key === 'g' || e.key === 'G') && (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) ) {
+        e.stopPropagation();
+      }
+    }, true);
+    // Placeholder cifratura base64 (da sostituire con hash sicuro in futuro)
+    function encodePassword(pw) {
+      return btoa(unescape(encodeURIComponent(pw)));
+    }
+    function decodePassword(pw) {
+      return decodeURIComponent(escape(atob(pw)));
+    }
+    // Struttura player
+    function getDefaultPlayer(username, password) {
+      return {
+        username,
+        password: encodePassword(password),
+        livello: 1,
+        esperienza: 0,
+        magie: [], // {elemento, proiezione}
+        vittorie: 0,
+        partite: 0
+      };
+    }
+    // Salva utente in localStorage (come array di player)
+    function savePlayer(player) {
+      let players = JSON.parse(localStorage.getItem('players') || '[]');
+      players = players.filter(p => p.username !== player.username);
+      players.push(player);
+      localStorage.setItem('players', JSON.stringify(players));
+    }
+    function getPlayer(username) {
+      let players = JSON.parse(localStorage.getItem('players') || '[]');
+      return players.find(p => p.username === username);
+    }
+    // Login
+    document.getElementById('login-form').onsubmit = function(e) {
+      e.preventDefault();
+      const user = document.getElementById('login-username').value.trim();
+      const pw = document.getElementById('login-password').value;
+      const player = getPlayer(user);
+      if (!player || player.password !== encodePassword(pw)) {
+        document.getElementById('login-error').textContent = 'Nome utente o password errati.';
+        return;
+      }
+      localStorage.setItem('currentPlayer', user);
+      window.location.href = 'home.html';
+    };
+    // Signup
+    document.getElementById('signup-form').onsubmit = function(e) {
+      e.preventDefault();
+      const user = document.getElementById('signup-username').value.trim();
+      const pw = document.getElementById('signup-password').value;
+      if (!user || !pw) {
+        document.getElementById('signup-error').textContent = 'Compila tutti i campi.';
+        return;
+      }
+      if (getPlayer(user)) {
+        document.getElementById('signup-error').textContent = 'Nome utente già esistente.';
+        return;
+      }
+      const player = getDefaultPlayer(user, pw);
+      savePlayer(player);
+      document.getElementById('signup-error').textContent = 'Registrazione avvenuta! Ora puoi fare login.';
+      setTimeout(() => {
+        document.getElementById('signup-form').style.display = 'none';
+        document.getElementById('login-form').style.display = '';
+      }, 1200);
+    };
+    // Switch tra login/signup
+    document.getElementById('switch-link').onclick = () => {
+      document.getElementById('login-form').style.display = 'none';
+      document.getElementById('signup-form').style.display = '';
+    };
+    document.getElementById('switch-link2').onclick = () => {
+      document.getElementById('signup-form').style.display = 'none';
+      document.getElementById('login-form').style.display = '';
+    };
+  </script>
+</body>
 </html>
