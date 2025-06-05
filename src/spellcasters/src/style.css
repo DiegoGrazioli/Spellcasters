@@ -13,9 +13,10 @@ html, body {
 }
 
 body {
-  background: #111;
-  color: white;
+  background: var(--bg-color);
+  color: var(--text-color);
   font-family: 'Segoe UI', sans-serif;
+  transition: background 0.7s cubic-bezier(.4,1.6,.4,1), color 0.7s cubic-bezier(.4,1.6,.4,1);
 }
 
 #spellCanvas {
@@ -228,5 +229,134 @@ body.night .login-label {
 }
 body.day .login-label {
   color: #7f5cff;
+}
+
+/* Stile per il modal delle impostazioni */
+.modal {
+  position: fixed;
+  left: 0; top: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  transition: opacity 0.3s;
+}
+.modal.hidden { display: none; }
+.modal-content {
+  background: var(--bg-color, #23233a);
+  color: var(--text-color, #fff);
+  border-radius: 18px;
+  box-shadow: 0 8px 32px #000a;
+  padding: 32px 36px 24px 36px;
+  min-width: 320px;
+  min-height: 180px;
+  text-align: center;
+  position: relative;
+}
+.modal-content.settings-large {
+  min-width: 540px;
+  min-height: 340px;
+  font-size: 1.22em;
+  font-family: 'Cinzel';
+  padding: 56px 64px 40px 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 28px;
+  text-align: left;
+}
+.modal-content.settings-large h2 {
+  align-self: center;
+  margin-bottom: 10px;
+}
+.modal-content.settings-large label {
+  width: 100%;
+  display: flex;
+  gap: 16px;
+  font-size: 1.15em;
+  justify-content: space-between;
+  margin-bottom: 0;
+}
+.settings-sliders {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-right: 10px;
+  width: 100%;
+}
+.settings-sliders label {
+  justify-content: space-between;
+  text-align: left;
+}
+.settings-sliders label > span,
+.settings-sliders label > input[type="range"] {
+  margin-left: 0;
+}
+.settings-sliders label > input[type="range"] {
+  margin-left: 32px;
+}
+#particle-count { width: 120px; text-align: right;}
+#particle-count-value { font-weight: bold; margin-left: 8px; text-align: right; }
+#close-settings { margin-top: 18px; align-self: center; }
+
+.keybindings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 18px 0 0 0;
+  align-items: flex-start;
+  width: 100%;
+}
+.keybinding-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  font-size: 1.08em;
+  justify-content: flex-end;
+  width: 100%;
+}
+.keybinding-row .key {
+  margin-left: auto;
+  margin-right: 8px;
+  background: #222a;
+  color: #fff;
+  border-radius: 6px;
+  padding: 2px 12px;
+  font-weight: bold;
+  font-family: 'Cinzel';
+  font-size: 1.08em;
+  margin-right: 8px;
+  box-shadow: 0 1px 4px #0003;
+}
+.keybinding-row span:last-child {
+  flex: 1;
+  text-align: right;
+}
+
+/* Foschia/nebbia bassa nella home */
+#home-fog-canvas {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 320px; /* aumentata l'altezza per evitare il taglio superiore */
+  width: 100vw;
+  pointer-events: none;
+  z-index: 0;
+  display: block;
+  background: linear-gradient(to top, rgba(0, 225, 255, 0.158), rgba(0, 0, 0, 0.0));
+}
+
+/* Aura magica attorno ai cerchi magici infusi */
+.magic-aura {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 50%;
+  filter: blur(32px) brightness(1.2) saturate(1.2);
+  opacity: 0.58;
+  z-index: 10;
+  mix-blend-mode: lighten;
 }
 

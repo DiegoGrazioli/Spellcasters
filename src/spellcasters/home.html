@@ -9,19 +9,47 @@
   <div id="home-container" class="centered">
     <h1 id="home-title">Spellcasters</h1>
     <div id="home-buttons">
-      <button id="lab-btn">Lab</button>
-      <button id="arena-btn">Arena</button>
+      <button id="btn-lab" class="main-btn">Lab</button>
+      <button id="btn-arena" class="main-btn">Arena</button>
+      <button id="btn-settings" class="main-btn">Set</button>
     </div>
   </div>
+  <div id="settings-modal" class="modal hidden">
+    <div class="modal-content settings-large">
+      <h2>Impostazioni</h2>
+      <div class="settings-sliders">
+        <label>Numero particelle:
+          <input type="range" id="particle-count" min="20" max="200" value="60">
+          <span id="particle-count-value">60</span>
+        </label>
+        <label>Audio (non ancora disponibile):
+          <input type="range" id="audio-volume" min="0" max="100" value="50" disabled>
+        </label>
+      </div>
+      <label style="font-size:1.15em;">Key Bindings (prossimamente personalizzabili):</label>
+      <div class="keybindings-list">
+        <div class="keybinding-row"><span class="key">Z</span><span>Inizia/disegna spell</span></div>
+        <div class="keybinding-row"><span class="key">G</span><span>Tema giorno</span></div>
+        <div class="keybinding-row"><span class="key">N</span><span>Tema notte</span></div>
+        <div class="keybinding-row"><span class="key">RMB</span><span>Annulla cerchio magico</span></div>
+      </div>
+      <button id="close-settings" class="main-btn" style="margin-top:24px;">Chiudi</button>
+    </div>
+  </div>
+  <!-- Sostituito il div foschia con un canvas per la foschia animata -->
+  <canvas id="home-fog-canvas"></canvas>
   <script type="module">
     import { createThemeToggle, initTheme, getTheme } from './src/theme.js';
     initTheme();
     const themeToggle = createThemeToggle();
-    document.getElementById('lab-btn').onclick = () => {
+    document.getElementById('btn-lab').onclick = () => {
       window.location.href = 'lab.html';
     };
-    document.getElementById('arena-btn').onclick = () => {
-      alert('Modalità Arena in arrivo!');
+    document.getElementById('btn-settings').onclick = () => {
+      document.getElementById('settings-modal').classList.remove('hidden');
+    };
+    document.getElementById('close-settings').onclick = () => {
+      document.getElementById('settings-modal').classList.add('hidden');
     };
     // Aggiorna la classe del body per il tema
     function updateBodyThemeClass() {
@@ -32,5 +60,6 @@
     updateBodyThemeClass();
     window.onThemeChange = updateBodyThemeClass;
   </script>
+  <script type="module" src="src/home.js"></script>
 </body>
 </html>

@@ -167,10 +167,12 @@ function recognizeSpell(points) {
 let fireParticles = [];
 let infusedElement = null;
 
+let particleCount = Number(localStorage.getItem('particleCount')) || 60;
+
 function showEffect(type) {
   const mousePos = { x: mouseX, y: mouseY };
   let newParticles = [];
-  const count = 60; // Numero base di particelle
+  const count = particleCount; // Numero base di particelle
 
   if (type === "cerchio") {
     magicCircle = {
@@ -312,6 +314,24 @@ function drawMagicCircle() {
   ctx.translate(x, y);
   ctx.rotate(circleRotation);
   ctx.translate(-x, -y);
+
+  // === Glow radiale dal centro per cerchio magico infuso ===
+  if (infusedElement && element) {
+    // Glow radiale: gradiente dal centro che sfuma verso l'esterno
+    const glowRadius = radius + 24;
+    const grad = ctx.createRadialGradient(x, y, 0, x, y, glowRadius);
+    grad.addColorStop(0, getElementColor(element) + 'cc'); // centro, più intenso
+    grad.addColorStop(0.45, getElementColor(element) + '44');
+    grad.addColorStop(0.85, getElementColor(element) + '11');
+    grad.addColorStop(1, getElementColor(element) + '00'); // trasparente
+    ctx.save();
+    ctx.globalAlpha = 0.45;
+    ctx.beginPath();
+    ctx.arc(x, y, glowRadius, 0, 2 * Math.PI);
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.restore();
+  }
 
   // === Pattern elementale se infuso ===
   if (infusedElement) {
