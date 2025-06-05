@@ -1,6 +1,6 @@
 // element-patterns.js
 // Funzione per disegnare i pattern elementali su un canvas
-function drawElementPattern(ctx, x, y, r, element) {
+export function drawElementPattern(ctx, x, y, r, element) {
   ctx.save();
   ctx.translate(x, y);
   if (element === 'fuoco') {
@@ -260,7 +260,7 @@ function drawElementPattern(ctx, x, y, r, element) {
 }
 
 // Funzione di inizializzazione per la preview
-function drawAllElementPatterns() {
+export function drawAllElementPatterns() {
   [
     ['pat-fuoco', 'fuoco'],
     ['pat-aria', 'aria'],

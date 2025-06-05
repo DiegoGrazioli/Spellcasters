@@ -1,6 +1,7 @@
 import DollarRecognizer from "./dollarRecognizer";
 import { drawManaSegments, setManaValues, getManaValues, setCurrentMana, getCurrentMana, getManaMax, getManaRecoverSpeed } from "./Manabar";
 import { setTheme, getTheme } from "./theme.js";
+import { drawElementPattern } from "./element-patterns.js";
 
 const recognizer = new DollarRecognizer();
 
@@ -164,6 +165,7 @@ function recognizeSpell(points) {
 }
 
 let fireParticles = [];
+let infusedElement = null;
 
 function showEffect(type) {
   const mousePos = { x: mouseX, y: mouseY };
@@ -177,7 +179,17 @@ function showEffect(type) {
       radius: 120,
       thickness: 3
     };
+    infusedElement = null;
     return; // Niente particelle, termina qui
+  }
+
+  // Se c'è un cerchio magico attivo e il simbolo è un elemento, infondi
+  if (magicCircle && ["fuoco", "acqua", "aria", "terra"].includes(type)) {
+    infusedElement = type;
+    // Cambia colore del cerchio magico
+    magicCircle.element = type;
+    showDebugMessage(`Cerchio magico infuso con ${type}`);
+    return;
   }
 
   const effects = {
@@ -295,16 +307,20 @@ function drawFireParticles() {
 function drawMagicCircle() {
   if (!magicCircle) return;
 
-  const { x, y, radius, thickness } = magicCircle;
-
+  const { x, y, radius, thickness, element } = magicCircle;
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(circleRotation);
   ctx.translate(-x, -y);
 
+  // === Pattern elementale se infuso ===
+  if (infusedElement) {
+    drawElementPattern(ctx, x, y, radius * 0.82, infusedElement);
+  }
+
   // === Cerchi principali ===
   ctx.lineWidth = thickness;
-  ctx.strokeStyle = "#ff00ff";
+  ctx.strokeStyle = element ? getElementColor(element) : "#ff00ff";
   ctx.beginPath();
   ctx.arc(x, y, radius, 0, 2 * Math.PI);
   ctx.stroke();
@@ -345,7 +361,7 @@ function drawMagicCircle() {
       alpha: 0.1 + Math.random() * 0.1,
       dx: (Math.random() - 0.5) * 0.3,
       dy: (Math.random() - 0.5) * 0.3,
-      color: "rgba(255, 0, 255,", // fucsia
+      color: element ? getElementColor(element) + "," : "rgba(255, 0, 255,",
     });
   }
 }
