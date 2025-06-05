@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400..900&display=swap');
+
 * {
   margin: 0;
   padding: 0;
@@ -25,6 +27,15 @@ body {
 
 :root {
   --mana-bar-color: #00eaff;
+  --button-inset: #fff;
+}
+
+body.night {
+  --button-inset: #000;
+}
+
+body.day {
+  --button-inset: #fff;
 }
 
 #mana-bar, #mana-bar .mana-inner {
@@ -69,3 +80,115 @@ body {
 }
 
 /* FINE DEBUG */
+
+/* Pulsanti minimalisti, futuristici e fantasy */
+button {
+  font-family: 'Cinzel', serif;
+  font-size: 1.5rem;
+  padding: 0.8em 2.5em;
+  border: 2px solid rgba(127, 92, 255, 0.45); /* bordo trasparente per fallback */
+  border-radius: 0.75em;
+  background: linear-gradient(90deg, #00eaff 0%, #7f5cff 100%);
+  color: #fff;
+  letter-spacing: 0.08em;
+  box-shadow:
+    0 0 16px 0 #00eaff55, 0 2px 8px 0 #0002,
+    inset 0 0 0 4px var(--button-inset); /* bordo interno dinamico */
+  cursor: pointer;
+  transition: background 0.3s, box-shadow 0.3s, transform 0.15s;
+  outline: none;
+  position: relative;
+  overflow: hidden;
+}
+button:before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  background: radial-gradient(circle, #fff8 0%, #00eaff00 80%);
+  transform: translate(-50%, -50%);
+  transition: width 0.4s, height 0.4s;
+  z-index: 0;
+}
+button:hover:before {
+  width: 220%;
+  height: 400%;
+}
+button:hover {
+  background: linear-gradient(90deg, #7f5cff 0%, #00eaff 100%);
+  box-shadow: 0 0 32px 0 #7f5cff99, 0 2px 16px 0 #0004;
+  transform: scale(1.04);
+}
+button:active {
+  transform: scale(0.98);
+}
+button {
+  z-index: 1;
+}
+button span, button svg {
+  position: relative;
+  z-index: 2;
+}
+button:focus {
+  outline: none;
+  box-shadow:
+    0 0 24px 0 #7f5cff99, 0 2px 16px 0 #0004,
+    inset 0 0 0 2.5px #fff8;
+}
+
+/* Pulsanti nella home centrati e distanziati */
+#home-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 128px;
+}
+#home-container button {
+  display: block;
+  margin: 0;
+  /* margin: 18px 0; */
+  width: 220px;
+  max-width: 90vw;
+}
+
+#home-buttons {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+}
+
+#home-btn {
+  width: 100%;
+  max-width: 100px;
+  font-size: 1.2rem;
+  padding: 0.5em 0em;
+  margin: 15px;
+}
+
+/* Titolo con colore dinamico */
+#home-title {
+  font-family: "Cinzel", serif;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  font-style: normal;
+  font-size: 3rem;
+  margin-bottom: 24px;
+  transition: color 0.4s;
+  color: var(--home-title-color, #7f5cff);
+}
+body.night #home-title {
+  color: #00eaff;
+}
+body.day #home-title {
+  color: #7f5cff;
+}
+
+/* Font per fantasy/futuristico */
+/* @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Orbitron:wght@600&display=swap'); */
+

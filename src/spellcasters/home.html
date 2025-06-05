@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Spellcasters - Home</title>
+  <link rel="stylesheet" href="src/style.css">
+</head>
+<body>
+  <div id="home-container" class="centered">
+    <h1 id="home-title">Spellcasters</h1>
+    <div id="home-buttons">
+      <button id="lab-btn">Lab</button>
+      <button id="arena-btn">Arena</button>
+    </div>
+  </div>
+  <script type="module">
+    import { createThemeToggle, initTheme, getTheme } from './src/theme.js';
+    initTheme();
+    const themeToggle = createThemeToggle();
+    document.getElementById('lab-btn').onclick = () => {
+      window.location.href = 'lab.html';
+    };
+    document.getElementById('arena-btn').onclick = () => {
+      alert('Modalità Arena in arrivo!');
+    };
+    // Aggiorna la classe del body per il tema
+    function updateBodyThemeClass() {
+      const theme = getTheme();
+      document.body.classList.remove('day', 'night');
+      document.body.classList.add(theme);
+    }
+    updateBodyThemeClass();
+    window.onThemeChange = updateBodyThemeClass;
+  </script>
+</body>
+</html>

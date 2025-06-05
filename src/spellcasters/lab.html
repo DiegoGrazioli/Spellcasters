@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Spellcasters - Lab</title>
+  <link rel="stylesheet" href="src/style.css">
+</head>
+<body>
+  <button id="home-btn">Home</button>
+  <div id="debug" class="hidden"></div>
+  <canvas id="spellCanvas"></canvas>
+  <script type="module">
+    import './src/main.js';
+    document.getElementById('home-btn').onclick = () => {
+      window.location.href = 'home.html';
+    };
+    import { createThemeToggle, initTheme, getTheme } from './src/theme.js';
+    initTheme();
+    // Aggiorna la classe del body per il tema
+    function updateBodyThemeClass() {
+      const theme = getTheme();
+      document.body.classList.remove('day', 'night');
+      document.body.classList.add(theme);
+    }
+    updateBodyThemeClass();
+    window.onThemeChange = updateBodyThemeClass;
+  </script>
+</body>
+</html>

@@ -1,5 +1,6 @@
 import DollarRecognizer from "./dollarRecognizer";
 import { drawManaSegments, setManaValues, getManaValues, setCurrentMana, getCurrentMana, getManaMax, getManaRecoverSpeed } from "./Manabar";
+import { setTheme, getTheme } from "./theme.js";
 
 const recognizer = new DollarRecognizer();
 
@@ -49,7 +50,7 @@ canvas.addEventListener("mousemove", (e) => {
   mouseY = e.clientY - rect.top;
   
   if (casting) {
-    const point = { x: e.clientX, y: e.clientY };
+    const point = { x: mouseX, y: mouseY };
     points.push(point);
     particles.push(createParticle(point.x, point.y));
     
@@ -84,34 +85,20 @@ window.addEventListener("keydown", (e) => {
     casting = true;
     points = [];
   }
+  if (e.key === 'n' || e.key === 'N') {
+    setTheme('night');
+  }
+  if (e.key === 'g' || e.key === 'G') {
+    setTheme('day');
+  }
 });
 
 window.addEventListener("keyup", (e) => {
   if (e.key === "z" || e.key === "Z") {
     casting = false;
+    // Riconosci spell usando punti relativi al canvas
     recognizeSpell(points);
     points = [];
-  }
-});
-
-let backgroundColor = '#ffffff'; // default giorno
-
-// Ripristina modalità da localStorage
-const savedMode = localStorage.getItem('mode');
-if (savedMode === 'night') {
-  backgroundColor = '#111111';
-} else if (savedMode === 'day') {
-  backgroundColor = '#ffffff';
-}
-
-window.addEventListener('keydown', (e) => {
-  if (e.key === 'n' || e.key === 'N') {
-    backgroundColor = '#111111'; // notte
-    localStorage.setItem('mode', 'night');
-  }
-  if (e.key === 'g' || e.key === 'G') {
-    backgroundColor = '#ffffff'; // giorno
-    localStorage.setItem('mode', 'day');
   }
 });
 
@@ -275,8 +262,7 @@ function showEffect(type) {
 
 
 function animate() {
-  ctx.fillStyle = backgroundColor;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
   if (casting) drawPath();
   updateParticles();
   drawParticles();
@@ -286,7 +272,7 @@ function animate() {
   regenMana();
   requestAnimationFrame(animate);
   circleRotation += 0.003;
-  drawManaSegments();
+  drawManaSegments(); // ora importata da manabar.js
 }
 
 // PARTICELLE ELEMENTALI
