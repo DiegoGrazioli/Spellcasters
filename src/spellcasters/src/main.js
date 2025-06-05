@@ -273,7 +273,7 @@ function animate() {
   requestAnimationFrame(animate);
   circleRotation += 0.003;
   drawManaSegments();
-  drawTemplate('terra', ctx); // Disegna il template del fuoco per debug
+  // drawTemplate('terra', ctx); // Disegna il template del fuoco per debug
 }
 
 // PARTICELLE ELEMENTALI
@@ -455,15 +455,4 @@ function regenMana() {
 }
 
 // Inizializza la barra del mana
-window.addEventListener("DOMContentLoaded", () => {
-  const manaBar = document.getElementById("mana-bar");
-  if (!manaBar.querySelector(".mana-inner")) {
-    const inner = document.createElement("div");
-    inner.className = "mana-inner";
-    inner.style.height = "100%";
-    inner.style.background = "linear-gradient(to right, cyan, blue)";
-    inner.style.width = `${(currentMana / maxMana) * 100}%`;
-    manaBar.appendChild(inner);
-  }
-  updateManaBar();
-});
+// (Rimosso il vecchio codice DOM-based per la barra del mana, ora gestita da manabar.js e canvas)

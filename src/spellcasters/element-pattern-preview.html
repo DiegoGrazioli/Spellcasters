@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Preview Pattern Elementali</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400..900&display=swap');
+    body { background: #181828; color: #fff; font-family: 'Segoe UI', sans-serif; }
+    .row { display: flex; gap: 48px; justify-content: center; margin-top: 48px; }
+    .pattern-box { display: flex; flex-direction: column; align-items: center; font-family: 'Cinzel'; }
+    .pattern-label { margin-top: 18px; font-size: 1.3rem; letter-spacing: 0.08em; text-shadow: 0 2px 8px #000a; }
+  </style>
+  <link rel="stylesheet" href="src/style.css">
+</head>
+<body>
+  <h1 id="home-title" style="text-align:center;margin-top:32px;letter-spacing:0.1em;">Preview Pattern Elementali</h1>
+  <div class="row">
+    <div class="pattern-box">
+      <canvas id="pat-fuoco" width="220" height="220"></canvas>
+      <div class="pattern-label">Fuoco</div>
+    </div>
+    <div class="pattern-box">
+      <canvas id="pat-aria" width="220" height="220"></canvas>
+      <div class="pattern-label">Aria</div>
+    </div>
+    <div class="pattern-box">
+      <canvas id="pat-acqua" width="220" height="220"></canvas>
+      <div class="pattern-label">Acqua</div>
+    </div>
+    <div class="pattern-box">
+      <canvas id="pat-terra" width="220" height="220"></canvas>
+      <div class="pattern-label">Terra</div>
+    </div>
+  </div>
+  <script src="src/element-patterns.js"></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', drawAllElementPatterns);
+  </script>
+</body>
+</html>

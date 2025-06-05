@@ -215,9 +215,8 @@ body.day #login-container {
   background: rgba(255,255,255,0.92);
 }
 
-#login-form, #signup-form {
-  /* ...existing code... */
-}
+/* #login-form, #signup-form {
+} */
 
 .login-label {
   font-family: 'Cinzel', serif;
