@@ -150,6 +150,43 @@ export default class DollarRecognizer {
         {x: 120, y: 110}, // Spostamento in alto
         {x: 100, y: 100}  // Chiusura del cerchio
     ]);
+
+    this.addGesture('proiettile', [
+        {x: 100, y: 100}, // Inizio al centro
+        {x: 120, y: 90},  // Spostamento a destra
+    ]);
+    this.addGesture('proiettile', [
+        {x: 100, y: 100}, // Inizio
+        {x: 120, y: 100}  // Orizzontale destra
+    ]);
+    this.addGesture('proiettile', [
+        {x: 100, y: 100}, // Inizio
+        {x: 80, y: 100}   // Orizzontale sinistra
+    ]);
+    this.addGesture('proiettile', [
+        {x: 100, y: 100}, // Inizio
+        {x: 100, y: 80}   // Verticale su
+    ]);
+    this.addGesture('proiettile', [
+        {x: 100, y: 100}, // Inizio
+        {x: 100, y: 120}  // Verticale giù
+    ]);
+    this.addGesture('proiettile', [
+        {x: 100, y: 100}, // Inizio
+        {x: 120, y: 120}  // Obliqua basso-destra
+    ]);
+    this.addGesture('proiettile', [
+        {x: 100, y: 100}, // Inizio
+        {x: 80, y: 120}   // Obliqua basso-sinistra
+    ]);
+    this.addGesture('proiettile', [
+        {x: 100, y: 100}, // Inizio
+        {x: 120, y: 80}   // Obliqua alto-destra
+    ]);
+    this.addGesture('proiettile', [
+        {x: 100, y: 100}, // Inizio
+        {x: 80, y: 80}    // Obliqua alto-sinistra
+    ]);
   }
 
   addGesture(name, points) {

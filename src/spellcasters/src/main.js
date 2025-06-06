@@ -98,7 +98,15 @@ window.addEventListener("keyup", (e) => {
   if (e.key === "z" || e.key === "Z") {
     casting = false;
     // Riconosci spell usando punti relativi al canvas
-    recognizeSpell(points);
+    const result = recognizer.recognize(points);
+    if (result.name === "proiettile" && result.score > 0.5) {
+      // Usa il primo e l'ultimo punto del tratto per la direzione
+      if (points.length >= 2) {
+        launchProjectile(points[0], points[points.length - 1]);
+      }
+    } else {
+      recognizeSpell(points);
+    }
     points = [];
   }
 });
@@ -275,6 +283,87 @@ function showEffect(type) {
 }
 
 
+// === PROIEZIONE: PROIETTILE ===
+let projectiles = [];
+
+function launchProjectile(start, end) {
+  // Consuma 1 mana per ogni proiettile
+  if (!spendMana(1)) return;
+
+  // Calcola direzione e velocità
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist < 30) return; // ignora tratti troppo corti
+  const speed = 16;
+  const vx = (dx / dist) * speed;
+  const vy = (dy / dist) * speed;
+  // Effetto particelle mana puro all'evocazione (molto denso)
+  for (let i = 0; i < 80; i++) {
+    activeMagicParticles.push({
+      x: start.x + (Math.random() - 0.5) * 22,
+      y: start.y + (Math.random() - 0.5) * 22,
+      radius: Math.random() * 2.2 + 1.2,
+      alpha: 0.18 + Math.random() * 0.18,
+      dx: (Math.random() - 0.5) * 1.5,
+      dy: (Math.random() - 0.5) * 1.5,
+      color: 'rgba(120,220,255,',
+    });
+  }
+  // Calcola la distanza massima fino al bordo canvas
+  let maxT = 1;
+  if (vx !== 0 || vy !== 0) {
+    const tx = vx > 0 ? (canvas.width - start.x) / vx : (0 - start.x) / vx;
+    const ty = vy > 0 ? (canvas.height - start.y) / vy : (0 - start.y) / vy;
+    // Prendi il più piccolo t positivo
+    const tArr = [tx, ty].filter(t => t > 0);
+    if (tArr.length > 0) maxT = Math.min(...tArr);
+  }
+  const maxLife = Math.floor(maxT);
+  projectiles.push({
+    x: start.x,
+    y: start.y,
+    vx,
+    vy,
+    life: maxLife,
+    alpha: 1
+  });
+}
+
+function updateProjectiles() {
+  for (let i = projectiles.length - 1; i >= 0; i--) {
+    const p = projectiles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life--;
+    p.alpha *= 0.97;
+
+    // --- Scia di mana puro: più visibile e grande ---
+    for (let j = 0; j < 8; j++) { // aumenta la densità
+      activeMagicParticles.push({
+        x: p.x + (Math.random() - 0.5) * 18,
+        y: p.y + (Math.random() - 0.5) * 18,
+        radius: Math.random() * 4 + 2.5, // più grande
+        alpha: 0.22 + Math.random() * 0.18, // più visibile
+        dx: (Math.random() - 0.5) * 1.1,
+        dy: (Math.random() - 0.5) * 1.1,
+        color: 'rgba(120,220,255,',
+      });
+    }
+    // --- Fine scia ---
+
+    // Rimuovi se esce dal canvas o termina la vita
+    if (p.life <= 0 || p.x < 0 || p.x > canvas.width || p.y < 0 || p.y > canvas.height) {
+      projectiles.splice(i, 1);
+    }
+  }
+}
+
+function drawProjectiles() {
+  
+}
+
+// === AGGIORNA E DISEGNA PROIEZIONI NEL LOOP ===
 function animate() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   if (casting) drawPath();
@@ -283,6 +372,8 @@ function animate() {
   drawFireParticles();
   drawMagicParticles();
   drawMagicCircle();
+  updateProjectiles();
+  drawProjectiles();
   regenMana();
   requestAnimationFrame(animate);
   circleRotation += 0.003;
@@ -392,7 +483,9 @@ function drawMagicParticles() {
     const p = activeMagicParticles[i];
     ctx.beginPath();
     ctx.arc(p.x, p.y, p.radius, 0, 2 * Math.PI);
-    ctx.fillStyle = p.color + `${p.alpha})`;
+    // Se il colore non termina con la virgola, aggiungila
+    let color = p.color.endsWith(',') ? p.color : p.color.replace(/\)$/, ',');
+    ctx.fillStyle = color + `${p.alpha})`;
     ctx.fill();
     p.x += p.dx;
     p.y += p.dy;
@@ -444,15 +537,6 @@ function resizeCanvas() {
 }
 
 // === MANA SYSTEM ===
-
-function updateManaBar() {
-  const manaBar = document.getElementById("mana-bar");
-  const inner = manaBar.querySelector(".mana-inner");
-  const percent = Math.max(0, Math.min(1, getCurrentMana() / getManaMax()));
-  if (inner) {
-    inner.style.width = `${percent * 100}%`;
-  }
-}
 
 function spendMana(amount) {
   if (getManaValues().inBurnout) return false;
