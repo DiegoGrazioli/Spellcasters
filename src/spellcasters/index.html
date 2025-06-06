@@ -120,19 +120,30 @@
         esperienza: 0,
         magie: [], // {elemento, proiezione}
         vittorie: 0,
-        partite: 0
+        partite: 0,
+        affinita: {}, // {fuoco: 0, acqua: 0, aria: 0, terra: 0, ...}
+        predisposizione: {} // {proiettile: 0, ...}
       };
     }
     // Salva utente in localStorage (come array di player)
     function savePlayer(player) {
       let players = JSON.parse(localStorage.getItem('players') || '[]');
       players = players.filter(p => p.username !== player.username);
+      // Assicura che i nuovi campi esistano
+      if (!player.affinita) player.affinita = {};
+      if (!player.predisposizione) player.predisposizione = {};
       players.push(player);
       localStorage.setItem('players', JSON.stringify(players));
     }
     function getPlayer(username) {
       let players = JSON.parse(localStorage.getItem('players') || '[]');
-      return players.find(p => p.username === username);
+      let p = players.find(p => p.username === username);
+      // Assicura che i nuovi campi esistano anche su player vecchi
+      if (p) {
+        if (!p.affinita) p.affinita = {};
+        if (!p.predisposizione) p.predisposizione = {};
+      }
+      return p;
     }
     // Login
     document.getElementById('login-form').onsubmit = function(e) {

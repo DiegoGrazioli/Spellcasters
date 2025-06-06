@@ -24,6 +24,11 @@ let circleRotation = 0;
 let mouseX = 0;
 let mouseY = 0;
 
+let fireParticles = [];
+let infusedElement = null;
+
+let particleCount = Number(localStorage.getItem('particleCount')) || 60;
+
 // === MANA SYSTEM ===
 // Usa solo il modulo manabar.js per gestire mana, manaMax, manaRecoverSpeed
 
@@ -156,6 +161,28 @@ function drawPath() {
   ctx.stroke();
 }
 
+function incrementaAffinita(elemento) {
+  let player = getPlayerData();
+  if (!player) return;
+  if (!player.affinita) player.affinita = {};
+  if (!player.affinita[elemento]) player.affinita[elemento] = 0;
+  player.affinita[elemento]++;
+  savePlayerData({ affinita: player.affinita });
+  // Aggiorna anche l'array dei player in localStorage (retrocompatibilità con info player)
+  let players = JSON.parse(localStorage.getItem('players') || '[]');
+  const idx = players.findIndex(p => p.username === player.username);
+  if (idx !== -1) {
+    players[idx].affinita = player.affinita;
+    localStorage.setItem('players', JSON.stringify(players));
+  }
+  // Log affinità in console
+  console.log('[Affinità attuali]');
+  Object.entries(player.affinita).forEach(([k, v]) => {
+    console.log(`${k}: ${v}`);
+  });
+}
+
+// Modifica recognizeSpell per aggiornare l'affinità
 function recognizeSpell(points) {
   if (points.length < 10) return null;
   const result = recognizer.recognize(points);
@@ -167,16 +194,15 @@ function recognizeSpell(points) {
     if (result.name !== "cerchio") {
       spendMana(1);
     }
+    // Aggiorna affinità se è un elemento
+    if (["fuoco", "acqua", "aria", "terra"].includes(result.name)) {
+      incrementaAffinita(result.name);
+    }
     return result.name;
   }
   showDebugMessage('Simbolo non riconosciuto', 1000);
   return null;
 }
-
-let fireParticles = [];
-let infusedElement = null;
-
-let particleCount = Number(localStorage.getItem('particleCount')) || 60;
 
 function showEffect(type) {
   const mousePos = { x: mouseX, y: mouseY };
@@ -249,7 +275,7 @@ function showEffect(type) {
           alpha: 0.6,
           dy: Math.sin(angle) * speed,
           dx: Math.cos(angle) * speed,
-          color: `rgba(240, 240, 255, ${Math.random() * 0.5 + 0.3})`,
+          color: `rgba(170,170,238,`, // Colore aria coerente
           life: 60,
           decay: 0.02,
           swirl: Math.random() * 0.2 - 0.1 // Effetto vortice
@@ -259,6 +285,9 @@ function showEffect(type) {
     terra: () => {
       // Effetto terra (particelle pesanti e vibranti)
       for (let i = 0; i < count * 0.8; i++) {
+        const r = Math.floor(180 + Math.random() * 40);
+        const g = Math.floor(160 + Math.random() * 30);
+        const b = Math.floor(100 + Math.random() * 40);
         newParticles.push({
           x: mousePos.x + (Math.random() - 0.5) * 30,
           y: mousePos.y + (Math.random() - 0.5) * 30,
@@ -266,7 +295,7 @@ function showEffect(type) {
           alpha: 1,
           dy: Math.random() * 0.2 - 0.1, // Movimento minimo
           dx: Math.random() * 0.2 - 0.1,
-          color: `rgba(${180 + Math.random() * 40}, ${160 + Math.random() * 30}, ${100 + Math.random() * 40}, ${Math.random() * 0.7 + 0.3})`,
+          color: `rgba(${r},${g},${b},`, // Colore terra coerente
           life: 150, // Durata maggiore
           decay: 0.005, // Decadimento più lento
           baseX: mousePos.x + (Math.random() - 0.5) * 40, // Posizione base per vibrazione
@@ -484,9 +513,7 @@ function drawMagicParticles() {
     const p = activeMagicParticles[i];
     ctx.beginPath();
     ctx.arc(p.x, p.y, p.radius, 0, 2 * Math.PI);
-    // Se il colore non termina con la virgola, aggiungila
-    let color = p.color.endsWith(',') ? p.color : p.color.replace(/\)$/, ',');
-    ctx.fillStyle = color + `${p.alpha})`;
+    ctx.fillStyle = p.color + p.alpha + ")";
     ctx.fill();
     p.x += p.dx;
     p.y += p.dy;

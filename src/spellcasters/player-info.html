@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Info Giocatore - Spellcasters</title>
+  <link rel="stylesheet" href="src/style-base.css">
+  <link rel="stylesheet" href="src/style-buttons.css">
+  <link rel="stylesheet" href="src/style-home.css">
+  <link rel="stylesheet" href="src/style-modal.css">
+  <link rel="stylesheet" href="src/style-expbar.css">
+  <style>
+    #player-info-container {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 32px;
+    }
+    #player-info-card {
+      background: rgba(34,34,51,0.92);
+      border-radius: 1.2em;
+      box-shadow: 0 0 32px #7f5cff44;
+      padding: 40px 36px 32px 36px;
+      min-width: 320px;
+      max-width: 95vw;
+      color: var(--text-color);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+      overflow-y: auto;
+      max-height: 90vh;
+    }
+    #player-info-card h2 {
+      font-family: 'Cinzel', serif;
+      font-size: 2.1em;
+      margin-bottom: 12px;
+      color: var(--home-title-color);
+    }
+    .player-info-row {
+      font-size: 1.18em;
+      display: flex;
+      gap: 18px;
+      justify-content: space-between;
+      font-family: 'Cinzel';
+      width: 100%;
+      max-width: 340px;
+    }
+    .player-info-label {
+      font-weight: bold;
+      color: #00eaff;
+      min-width: 120px;
+    }
+    .player-info-value {
+      color: #fff;
+      text-align: right;
+      flex: 1;
+    }
+    #back-home-btn {
+      margin-top: 32px;
+      min-width: 180px;
+      min-height: 48px;
+      font-size: 1.18em;
+      line-height: 1.2;
+    }
+    .player-info-graph-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+      max-width: 400px;
+      margin: 32px 0 0 0;
+    }
+    .player-info-graph-section h3 {
+      font-family: 'Cinzel';
+      color: var(--home-title-color);
+      font-size: 1.2em;
+      margin-bottom: 8px;
+      text-align: center;
+    }
+    .player-info-graph-section canvas {
+      display: block;
+      margin: 0 auto 24px auto;
+    }
+    /* Scrollbar custom */
+    #player-info-card::-webkit-scrollbar {
+      width: 12px;
+      background: rgba(127,92,255,0.08);
+      border-radius: 8px;
+    }
+    #player-info-card::-webkit-scrollbar-thumb:hover {
+      background: linear-gradient(180deg, #00eaff 0%, #7f5cff 100%);
+    }
+    #player-info-card {
+      scrollbar-width: thin;
+      scrollbar-color: #7f5cff #23233a;
+    }
+    @media (max-width: 500px) {
+      #player-info-card {
+        min-width: 0;
+        padding: 18px 2vw 18px 2vw;
+        max-width: 99vw;
+      }
+      .player-info-graph-section {
+        max-width: 99vw;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="player-info-container">
+    <div id="player-info-card">
+      <h2>Info Giocatore</h2>
+      <div class="player-info-row"><span class="player-info-label">Username:</span><span class="player-info-value" id="info-username"></span></div>
+      <div class="player-info-row"><span class="player-info-label">Livello:</span><span class="player-info-value" id="info-level"></span></div>
+      <div class="player-info-row"><span class="player-info-label">Esperienza:</span><span class="player-info-value" id="info-exp"></span></div>
+      <div class="player-info-row"><span class="player-info-label">Mana:</span><span class="player-info-value" id="info-mana"></span></div>
+      <div class="player-info-row"><span class="player-info-label">Vittorie:</span><span class="player-info-value" id="info-vittorie"></span></div>
+      <div class="player-info-row"><span class="player-info-label">Partite:</span><span class="player-info-value" id="info-partite"></span></div>
+      <div class="player-info-graph-section">
+        <h3>Affinità Elementi</h3>
+        <canvas id="affinity-radar" width="340" height="220"></canvas>
+        <h3 style="margin:24px 0 8px 0;">Predisposizione Proiezioni</h3>
+        <canvas id="predisposition-radar" width="340" height="220"></canvas>
+      </div>
+      <button id="back-home-btn" class="main-btn home-btn-long">Torna alla Home</button>
+    </div>
+  </div>
+  <script type="module">
+    import { getTheme, initTheme } from './src/theme.js';
+    initTheme();
+    function updateBodyThemeClass() {
+      const theme = getTheme();
+      document.body.classList.remove('day', 'night');
+      document.body.classList.add(theme);
+    }
+    updateBodyThemeClass();
+    window.onThemeChange = updateBodyThemeClass;
+    // Recupera dati player
+    function getPlayer(username) {
+      let players = JSON.parse(localStorage.getItem('players') || '[]');
+      return players.find(p => p.username === username);
+    }
+    function getPlayerData() {
+      const username = localStorage.getItem('currentPlayer');
+      if (!username) return null;
+      const player = getPlayer(username);
+      if (!player) return null;
+      // Recupera anche mana attuale se presente (da playerData)
+      let mana = 100;
+      try {
+        const playerData = JSON.parse(localStorage.getItem('playerData_' + username));
+        if (playerData && typeof playerData.mana === 'number') mana = playerData.mana;
+      } catch {}
+      return {
+        username: player.username,
+        livello: player.livello || player.level || 1,
+        esperienza: player.esperienza || player.exp || 0,
+        mana,
+        vittorie: player.vittorie || 0,
+        partite: player.partite || 0,
+        affinita: player.affinita || {},
+        predisposizione: player.predisposizione || {}
+      };
+    }
+    // Chart.js CDN loader
+    function loadChartJs(callback) {
+      if (window.Chart) return callback();
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+      script.onload = callback;
+      document.head.appendChild(script);
+    }
+    // Dati radar
+    function getRadarDataAffinita(affinita) {
+      const elementi = ['fuoco', 'acqua', 'aria', 'terra'];
+      const colori = {
+        fuoco: '#ff5555',
+        acqua: '#00eaff',
+        aria: '#aaaaee', // Colore aria come particelle: #aaaaee
+        terra: 'rgba(180,160,100)' // Colore terra come particelle: #55aa55
+      };
+      return {
+        labels: elementi,
+        data: elementi.map(e => affinita && affinita[e] ? affinita[e] : 0),
+        colori: elementi.map(e => colori[e])
+      };
+    }
+    function getRadarDataPredisposizione(predisposizione) {
+      const tipi = ['proiettile']; // Estendibile
+      return {
+        labels: tipi,
+        data: tipi.map(t => predisposizione && predisposizione[t] ? predisposizione[t] : 0)
+      };
+    }
+    let radarChart1 = null;
+    let radarChart2 = null;
+    function renderRadarCharts(affinita, predisposizione) {
+      loadChartJs(() => {
+        const ctx1 = document.getElementById('affinity-radar').getContext('2d');
+        const ctx2 = document.getElementById('predisposition-radar').getContext('2d');
+        const data1 = getRadarDataAffinita(affinita);
+        const data2 = getRadarDataPredisposizione(predisposizione);
+        // Distruggi eventuali istanze precedenti
+        if (window.Chart) {
+          if (radarChart1) { radarChart1.destroy(); }
+          if (radarChart2) { radarChart2.destroy(); }
+        }
+        radarChart1 = new window.Chart(ctx1, {
+          type: 'radar',
+          data: {
+            labels: data1.labels,
+            datasets: [{
+              label: 'Utilizzo Elementi',
+              data: data1.data,
+              backgroundColor: 'rgba(0,234,255,0.10)',
+              borderColor: 'rgba(255,255,255,0.5)',
+              pointBackgroundColor: data1.colori,
+              pointBorderColor: 'rgba(127,92,255,0.0)',
+              borderWidth: 3,
+              pointRadius: 6,
+              pointHoverRadius: 8
+            }]
+          },
+          options: {
+            plugins: { legend: { display: false } },
+            scales: {
+              r: {
+                angleLines: { color: '#7f5cff44' },
+                grid: { color: '#7f5cff22' },
+                pointLabels: { font: { family: 'Cinzel', size: 14 }, color: data1.colori },
+                ticks: { display: false }
+              }
+            },
+            responsive: false
+          }
+        });
+        radarChart2 = new window.Chart(ctx2, {
+          type: 'radar',
+          data: {
+            labels: data2.labels,
+            datasets: [{
+              label: 'Utilizzo Proiezioni',
+              data: data2.data,
+              backgroundColor: 'rgba(127,92,255,0.18)',
+              borderColor: '#7f5cff',
+              pointBackgroundColor: '#7f5cff',
+              borderWidth: 2
+            }]
+          },
+          options: {
+            plugins: { legend: { display: false } },
+            scales: { r: { angleLines: { color: '#7f5cff44' }, grid: { color: '#7f5cff22' }, pointLabels: { font: { family: 'Cinzel', size: 14 }, color: '#7f5cff' }, ticks: { display: false } } },
+            responsive: false
+          }
+        });
+      });
+    }
+    function getExpToNext(level) {
+      return Math.floor(100 + 30 * Math.pow(level, 1.5));
+    }
+    function renderPlayerInfo() {
+      const data = getPlayerData();
+      if (!data) {
+        document.getElementById('player-info-card').innerHTML = '<h2>Errore</h2><p>Utente non trovato. Effettua di nuovo il login.</p>';
+        return;
+      }
+      document.getElementById('info-username').textContent = data.username;
+      document.getElementById('info-level').textContent = data.livello;
+      // Esperienza: mostra attuale/necessaria
+      const expToNext = getExpToNext(data.livello);
+      document.getElementById('info-exp').textContent = `${data.esperienza}/${expToNext}`;
+      document.getElementById('info-mana').textContent = data.mana;
+      document.getElementById('info-vittorie').textContent = data.vittorie;
+      document.getElementById('info-partite').textContent = data.partite;
+      renderRadarCharts(data.affinita, data.predisposizione);
+    }
+    renderPlayerInfo();
+    document.getElementById('back-home-btn').onclick = () => {
+      window.location.href = 'home.html';
+    };
+    // Aggiorna dati e radar chart quando la pagina torna visibile
+    if (typeof document.hidden !== 'undefined') {
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+          renderPlayerInfo();
+        }
+      });
+    }
+  </script>
+</body>
+</html>

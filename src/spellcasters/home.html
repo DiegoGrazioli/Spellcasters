@@ -18,7 +18,7 @@
       <button id="btn-settings" class="main-btn home-btn-long">Set</button>
     </div>
     <div id="home-bottom-buttons">
-      <button id="btn-logout" class="main-btn home-btn-bottom">Log out</button>
+      <button id="logout-btn" class="main-btn home-btn-bottom">Log out</button>
       <button id="btn-player-info" class="main-btn home-btn-bottom">Info Player</button>
     </div>
   </div>
@@ -60,13 +60,13 @@
       document.getElementById('settings-modal').classList.add('hidden');
     };
     // Pulsante logout
-    document.getElementById('btn-logout').onclick = () => {
+    document.getElementById('logout-btn').onclick = () => {
       localStorage.removeItem('currentPlayer');
       window.location.href = 'index.html';
     };
-    // Pulsante info player (placeholder)
+    // Pulsante info player (ora un vero link)
     document.getElementById('btn-player-info').onclick = () => {
-      alert('Info giocatore in arrivo!');
+      window.location.href = 'player-info.html';
     };
     // Aggiorna la classe del body per il tema
     function updateBodyThemeClass() {

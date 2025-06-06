@@ -37,13 +37,7 @@
   font-size: 3rem;
   margin-bottom: 24px;
   transition: color 0.4s;
-  color: var(--home-title-color, #7f5cff);
-}
-body.night #home-title {
-  color: #00eaff;
-}
-body.day #home-title {
-  color: #7f5cff;
+  color: var(--home-title-color);
 }
 
 #home-fog-canvas {

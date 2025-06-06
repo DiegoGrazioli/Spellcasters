@@ -5,12 +5,10 @@ button {
   padding: 0.8em 2.5em;
   border: 2px solid rgba(127, 92, 255, 0.45);
   border-radius: 0.75em;
-  background: linear-gradient(90deg, #00eaff 0%, #7f5cff 100%);
+  background: var(--button-gradient);
   color: #fff;
   letter-spacing: 0.08em;
-  box-shadow:
-    0 0 16px 0 #00eaff55, 0 2px 8px 0 #0002,
-    inset 0 0 0 4px var(--button-inset);
+  box-shadow: var(--button-shadow);
   cursor: pointer;
   transition: background 0.3s, box-shadow 0.3s, transform 0.15s;
   outline: none;
@@ -36,8 +34,8 @@ button:hover:before {
   height: 400%;
 }
 button:hover {
-  background: linear-gradient(90deg, #7f5cff 0%, #00eaff 100%);
-  box-shadow: 0 0 32px 0 #7f5cff99, 0 2px 16px 0 #0004;
+  background: var(--button-gradient-hover);
+  box-shadow: var(--button-shadow-hover);
   transform: scale(1.04);
 }
 button:active {
@@ -49,9 +47,7 @@ button span, button svg {
 }
 button:focus {
   outline: none;
-  box-shadow:
-    0 0 24px 0 #7f5cff99, 0 2px 16px 0 #0004,
-    inset 0 0 0 2.5px #fff8;
+  box-shadow: var(--button-shadow-focus);
 }
 
 .home-btn-long {
@@ -77,4 +73,11 @@ button:focus {
 
 .btn-permanent {
   position: fixed;
+}
+
+#logout-btn {
+  background: var(--logout-gradient) !important;
+}
+#logout-btn:hover {
+  background: var(--logout-gradient-hover) !important;
 }

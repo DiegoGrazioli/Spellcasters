@@ -23,14 +23,38 @@ body {
 :root {
   --mana-bar-color: #00eaff;
   --button-inset: #fff;
+  --button-gradient: linear-gradient(90deg, #00eaff 0%, #7f5cff 100%);
+  --button-gradient-hover: linear-gradient(90deg, #7f5cff 0%, #00eaff 100%);
+  --button-shadow: 0 0 16px 0 #00eaff55, 0 2px 8px 0 #0002, inset 0 0 0 4px var(--button-inset);
+  --button-shadow-hover: 0 0 32px 0 #7f5cff99, 0 2px 16px 0 #0004;
+  --button-shadow-focus: 0 0 24px 0 #7f5cff99, 0 2px 16px 0 #0004, inset 0 0 0 2.5px #fff8;
+  --home-title-color: #7f5cff;
+  --logout-gradient: linear-gradient(90deg, #7f5cff 0%, #ff0000 100%);
+  --logout-gradient-hover: linear-gradient(90deg, #ff0000 0%, #7f5cff 100%);
 }
 
 body.night {
   --button-inset: #000;
+  --button-gradient: linear-gradient(90deg, #23233a 0%, #00eaff 100%);
+  --button-gradient-hover: linear-gradient(90deg, #00eaff 0%, #23233a 100%);
+  --button-shadow: 0 0 16px 0 #00eaff99, 0 2px 8px 0 #0004, inset 0 0 0 4px var(--button-inset);
+  --button-shadow-hover: 0 0 32px 0 #00eaffcc, 0 2px 16px 0 #0006;
+  --button-shadow-focus: 0 0 24px 0 #00eaffcc, 0 2px 16px 0 #0006, inset 0 0 0 2.5px #fff8;
+  --home-title-color: #00eaff;
+  --logout-gradient: linear-gradient(90deg, #23233a 0%, #ff3c3c 100%);
+  --logout-gradient-hover: linear-gradient(90deg, #ff3c3c 0%, #23233a 100%);
 }
 
 body.day {
   --button-inset: #fff;
+  --button-gradient: linear-gradient(90deg, #00eaff 0%, #7f5cff 100%);
+  --button-gradient-hover: linear-gradient(90deg, #7f5cff 0%, #00eaff 100%);
+  --button-shadow: 0 0 16px 0 #00eaff55, 0 2px 8px 0 #0002, inset 0 0 0 4px var(--button-inset);
+  --button-shadow-hover: 0 0 32px 0 #7f5cff99, 0 2px 16px 0 #0004;
+  --button-shadow-focus: 0 0 24px 0 #7f5cff99, 0 2px 16px 0 #0004, inset 0 0 0 2.5px #fff8;
+  --home-title-color: #7f5cff;
+  --logout-gradient: linear-gradient(90deg, #7f5cff 0%, #ff0000 100%);
+  --logout-gradient-hover: linear-gradient(90deg, #ff0000 0%, #7f5cff 100%);
 }
 
 .hidden {
