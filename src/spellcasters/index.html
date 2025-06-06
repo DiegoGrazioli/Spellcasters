@@ -2,7 +2,11 @@
 <html lang="it">
 <head>
   <meta charset="UTF-8" />
-  <link rel="stylesheet" href="src/style.css" />
+  <link rel="stylesheet" href="src/style-base.css" />
+  <link rel="stylesheet" href="src/style-buttons.css" />
+  <link rel="stylesheet" href="src/style-home.css" />
+  <link rel="stylesheet" href="src/style-modal.css" />
+  <link rel="stylesheet" href="src/style-expbar.css" />
   <title>Spellcaster - Login</title>
   <style>
     #login-container {
@@ -141,8 +145,7 @@
         return;
       }
       localStorage.setItem('currentPlayer', user);
-      setPlayerLevelData(playerData.level, playerData.exp, getExpToNext(playerData.level));
-      drawExpBar();
+      // Rimosso: setPlayerLevelData e drawExpBar (gestiti in home)
       window.location.href = 'home.html';
     };
     // Signup

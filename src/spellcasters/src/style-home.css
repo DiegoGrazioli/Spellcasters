@@ -1,0 +1,60 @@
+/* Home page layout, titoli, fog, container */
+#home-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 128px;
+}
+#home-container button {
+  display: block;
+  margin: 0;
+  width: 320px;
+  max-width: 90vw;
+}
+
+#home-buttons {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 32px;
+  margin-bottom: 32px;
+}
+
+#home-bottom-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 32px;
+  margin-top: 32px;
+}
+
+#home-title {
+  font-family: "Cinzel", serif;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  font-style: normal;
+  font-size: 3rem;
+  margin-bottom: 24px;
+  transition: color 0.4s;
+  color: var(--home-title-color, #7f5cff);
+}
+body.night #home-title {
+  color: #00eaff;
+}
+body.day #home-title {
+  color: #7f5cff;
+}
+
+#home-fog-canvas {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 320px;
+  width: 100vw;
+  pointer-events: none;
+  z-index: 0;
+  display: block;
+  background: linear-gradient(to top, rgba(0, 225, 255, 0.158), rgba(0, 0, 0, 0.0));
+}

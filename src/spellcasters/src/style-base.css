@@ -1,0 +1,93 @@
+/* Reset, variabili, body, font, utility */
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400..900&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: var(--bg-color);
+  color: var(--text-color);
+  font-family: 'Segoe UI', sans-serif;
+  transition: background 0.7s cubic-bezier(.4,1.6,.4,1), color 0.7s cubic-bezier(.4,1.6,.4,1);
+}
+
+:root {
+  --mana-bar-color: #00eaff;
+  --button-inset: #fff;
+}
+
+body.night {
+  --button-inset: #000;
+}
+
+body.day {
+  --button-inset: #fff;
+}
+
+.hidden {
+  opacity: 0;
+}
+
+.visible {
+  opacity: 1;
+}
+
+/* Utility */
+#spellCanvas {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  cursor: crosshair;
+}
+
+#mana-bar, #mana-bar .mana-inner {
+  display: none !important;
+}
+
+#mana-segments {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 200;
+}
+
+/* DEBUG */
+#debug {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  background-color: rgba(0, 0, 0, 0.7);
+  color: #0ff;
+  font-size: 16px;
+  border: 1px solid #0ff;
+  border-radius: 6px;
+  font-family: monospace;
+  pointer-events: none;
+  transition: opacity 0.3s;
+  z-index: 10;
+}
+
+/* Aura magica attorno ai cerchi magici infusi */
+.magic-aura {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 50%;
+  filter: blur(32px) brightness(1.2) saturate(1.2);
+  opacity: 0.58;
+  z-index: 10;
+  mix-blend-mode: lighten;
+}

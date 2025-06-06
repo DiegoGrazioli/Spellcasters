@@ -3,15 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <title>Spellcasters - Home</title>
-  <link rel="stylesheet" href="src/style.css">
+  <link rel="stylesheet" href="src/style-base.css">
+  <link rel="stylesheet" href="src/style-buttons.css">
+  <link rel="stylesheet" href="src/style-home.css">
+  <link rel="stylesheet" href="src/style-modal.css">
+  <link rel="stylesheet" href="src/style-expbar.css">
 </head>
 <body>
   <div id="home-container" class="centered">
     <h1 id="home-title">Spellcasters</h1>
     <div id="home-buttons">
-      <button id="btn-lab" class="main-btn">Lab</button>
-      <button id="btn-arena" class="main-btn">Arena</button>
-      <button id="btn-settings" class="main-btn">Set</button>
+      <button id="btn-lab" class="main-btn home-btn-long">Lab</button>
+      <button id="btn-arena" class="main-btn home-btn-long">Arena</button>
+      <button id="btn-settings" class="main-btn home-btn-long">Set</button>
+    </div>
+    <div id="home-bottom-buttons">
+      <button id="btn-logout" class="main-btn home-btn-bottom">Log out</button>
+      <button id="btn-player-info" class="main-btn home-btn-bottom">Info Player</button>
     </div>
   </div>
   <div id="settings-modal" class="modal hidden">
@@ -50,6 +58,15 @@
     };
     document.getElementById('close-settings').onclick = () => {
       document.getElementById('settings-modal').classList.add('hidden');
+    };
+    // Pulsante logout
+    document.getElementById('btn-logout').onclick = () => {
+      localStorage.removeItem('currentPlayer');
+      window.location.href = 'index.html';
+    };
+    // Pulsante info player (placeholder)
+    document.getElementById('btn-player-info').onclick = () => {
+      alert('Info giocatore in arrivo!');
     };
     // Aggiorna la classe del body per il tema
     function updateBodyThemeClass() {
