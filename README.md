@@ -85,6 +85,15 @@ Più si utilizza la magia, più aumenta l’esperienza. L’esperienza permette 
 
 Se si ignora il mana rimanente e lo si oltrepassa, si va in **burnout** (le magie attive si annullano e non si possono utilizzare magie per 5 secondi)
 
+### Consumo di mana:
+- Elementi: 1 mana
+- Proiezioni (non permanenti): 2 mana
+- Proiezioni (permanenti): 2 mana (consumo ogni 0.1 secondi)
+- Proiezioni spaziali: lunghezza (in percentuale) * altezza (in percentuale) mana
+- Cerchi magici: 0 mana
+- Cerchi magici caricati di elementi e proiezioni (non permanenti): proiezione * 1.5 mana
+- Cerchi magici caricati di elementi e proiezioni: proiezione (consumo ogni 0.1 secondi) mana
+
 #### Note per lo sviluppatore:
 
 ##### Modalità di implementazione graduale:
