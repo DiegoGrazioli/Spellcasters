@@ -1,7 +1,7 @@
 import DollarRecognizer from "./dollarRecognizer";
 import { drawManaSegments, setManaValues, getManaValues, setCurrentMana, getCurrentMana, getManaMax, getManaRecoverSpeed } from "./Manabar";
 import { setTheme, getTheme } from "./theme.js";
-import { drawElementPattern } from "./element-patterns.js";
+import { drawElementPattern, drawMagicTrianglePattern } from "./element-patterns.js";
 import { getPlayerData, savePlayerData } from "./playerData.js";
 
 const recognizer = new DollarRecognizer();
@@ -26,6 +26,7 @@ let mouseY = 0;
 
 let fireParticles = [];
 let infusedElement = null;
+let infusedProjection = null;
 
 let particleCount = Number(localStorage.getItem('particleCount')) || 60;
 
@@ -103,16 +104,8 @@ window.addEventListener("keydown", (e) => {
 window.addEventListener("keyup", (e) => {
   if (e.key === "z" || e.key === "Z") {
     casting = false;
-    // Riconosci spell usando punti relativi al canvas
-    const result = recognizer.recognize(points);
-    if (result.name === "proiettile" && result.score > 0.5) {
-      // Usa il primo e l'ultimo punto del tratto per la direzione
-      if (points.length >= 2) {
-        launchProjectile(points[0], points[points.length - 1]);
-      }
-    } else {
-      recognizeSpell(points);
-    }
+    // Chiama sempre recognizeSpell per gestire il simbolo disegnato
+    recognizeSpell(points);
     points = [];
   }
 });
@@ -186,28 +179,78 @@ function incrementaAffinita(elemento) {
 function recognizeSpell(points) {
   if (points.length < 10) return null;
   const result = recognizer.recognize(points);
-  // Soglia di confidenza
+
   if (result.score > 0.60) {
     showDebugMessage(`Simbolo riconosciuto: ${result.name} (${Math.round(result.score * 100)}% confidenza)`);
-    showEffect(result.name);
-    // Consuma 1 mana SOLO se non è il cerchio magico
-    if (result.name !== "cerchio") {
-      spendMana(1);
+
+    // Priorità 1: Infusione se un cerchio magico è attivo
+    if (magicCircle) {
+      // Infusione Proiezione
+      if (["proiettile", "triangolo"].includes(result.name)) {
+        // Calcola il centroide del gesto
+        const centroid = points.reduce((acc, p) => ({x: acc.x + p.x, y: acc.y + p.y}), {x:0, y:0});
+        centroid.x /= points.length;
+        centroid.y /= points.length;
+        // Calcola distanza dal centro del cerchio magico
+        const dx = centroid.x - magicCircle.x;
+        const dy = centroid.y - magicCircle.y;
+        const dist = Math.hypot(dx, dy);
+
+        // Solo se il gesto è dentro il cerchio magico
+        if (dist < magicCircle.radius) {
+          magicCircle.proiezione = result.name;
+          infusedProjection = result.name;
+          showDebugMessage(`Cerchio magico infuso con proiezione: ${result.name}`);
+          return result.name;
+        }
+      }
+      // Infusione Elemento
+      if (["fuoco", "acqua", "aria", "terra"].includes(result.name)) {
+        magicCircle.elemento = result.name;
+        infusedElement = result.name; // Aggiorna stato globale per il disegno del cerchio
+        showDebugMessage(`Cerchio magico infuso con elemento: ${result.name}`);
+        incrementaAffinita(result.name); // L'affinità aumenta anche con l'infusione
+        // NESSUN costo di mana o effetto particellare per l'INFUSIONE
+        return result.name; // Esce dalla funzione, infusione completata
+      }
     }
-    // Aggiorna affinità se è un elemento
-    if (["fuoco", "acqua", "aria", "terra"].includes(result.name)) {
+
+    // Priorità 2: Creazione del cerchio magico stesso (se non c'era infusione e il simbolo è "cerchio")
+    if (result.name === "cerchio") {
+      showEffect(result.name); // Chiama showEffect per creare l'oggetto magicCircle
+      // NESSUN costo di mana per creare il cerchio in questa fase
+      return result.name;
+    }
+
+    // Priorità 3: Lancio diretto di un elemento o proiezione
+    // Questa parte viene eseguita se non è avvenuta un'infusione e non si sta creando un cerchio.
+
+    if (result.name === "proiettile" || result.name === "triangolo") {
+      // Per il lancio diretto di proiettili/triangoli
+      if (points.length >= 2) { // Necessario per la direzione del proiettile
+        launchProjectile(points[0], points[points.length - 1]);
+        // La funzione launchProjectile gestisce già il costo di mana e le particelle
+      }
+    } else if (["fuoco", "acqua", "aria", "terra"].includes(result.name)) {
+      // Per il lancio diretto di elementi
+      showEffect(result.name); // Mostra particelle per elementi
       incrementaAffinita(result.name);
+      spendMana(1); // Costo per lanciare un elemento direttamente
+    } else {
+      // Gestisci altri tipi di magie dirette se necessario, o un effetto generico
+      showEffect(result.name); // Potrebbe non fare nulla se il tipo non è gestito in showEffect
     }
     return result.name;
   }
+
   showDebugMessage('Simbolo non riconosciuto', 1000);
   return null;
 }
 
 function showEffect(type) {
   const mousePos = { x: mouseX, y: mouseY };
-  let newParticles = [];
-  const count = particleCount; // Numero base di particelle
+  let newParticles = []; // Sarà popolato dagli effetti degli elementi
+  const count = particleCount;
 
   if (type === "cerchio") {
     magicCircle = {
@@ -215,19 +258,15 @@ function showEffect(type) {
       y: mousePos.y,
       radius: 120,
       thickness: 3
+      // element e proiezione verranno impostati durante l'infusione in recognizeSpell
     };
-    infusedElement = null;
-    return; // Niente particelle, termina qui
+    infusedElement = null; // Resetta lo stato globale per il disegno
+    infusedProjection = null; // Resetta lo stato globale per il disegno
+    return; // Cerchio magico creato, nessuna particella da questa funzione per esso.
   }
 
-  // Se c'è un cerchio magico attivo e il simbolo è un elemento, infondi
-  if (magicCircle && ["fuoco", "acqua", "aria", "terra"].includes(type)) {
-    infusedElement = type;
-    // Cambia colore del cerchio magico
-    magicCircle.element = type;
-    showDebugMessage(`Cerchio magico infuso con ${type}`);
-    return;
-  }
+  // Il resto di showEffect è per gli effetti particellari degli elementi lanciati DIRETTAMENTE.
+  // La logica di infusione che era qui è ora gestita completamente da recognizeSpell.
 
   const effects = {
     fuoco: () => {
@@ -304,12 +343,14 @@ function showEffect(type) {
         });
       }
     }
-
-    
+    // NON ci sono "proiettile" o "triangolo" qui, perché launchProjectile gestisce le proprie particelle.
   };
 
-  if (effects[type]) effects[type]();
-  activeMagicParticles.push(...newParticles);
+  if (effects[type]) {
+    effects[type](); // Questo popolerà newParticles se è un elemento
+    activeMagicParticles.push(...newParticles); // Aggiungi all'array globale delle particelle
+  }
+  // Se il tipo non è un elemento e non è "cerchio", nessuna particella specifica viene generata da questa funzione.
 }
 
 
@@ -317,7 +358,7 @@ function showEffect(type) {
 let projectiles = [];
 
 function launchProjectile(start, end) {
-  // Consuma 1 mana per ogni proiettile
+  // Consuma 2 mana per ogni proiettile
   if (!spendMana(2)) return;
 
   // Calcola direzione e velocità
@@ -368,7 +409,7 @@ function updateProjectiles() {
     p.life--;
     p.alpha *= 0.97;
 
-    // --- Scia di mana puro: più visibile e grande ---
+    // --- Scia di mana puro ---
     for (let j = 0; j < 8; j++) { // aumenta la densità
       activeMagicParticles.push({
         x: p.x + (Math.random() - 0.5) * 18,
@@ -438,13 +479,12 @@ function drawMagicCircle() {
 
   // === Glow radiale dal centro per cerchio magico infuso ===
   if (infusedElement && element) {
-    // Glow radiale: gradiente dal centro che sfuma verso l'esterno
     const glowRadius = radius + 24;
     const grad = ctx.createRadialGradient(x, y, 0, x, y, glowRadius);
-    grad.addColorStop(0, getElementColor(element) + 'cc'); // centro, più intenso
+    grad.addColorStop(0, getElementColor(element) + 'cc');
     grad.addColorStop(0.45, getElementColor(element) + '44');
     grad.addColorStop(0.85, getElementColor(element) + '11');
-    grad.addColorStop(1, getElementColor(element) + '00'); // trasparente
+    grad.addColorStop(1, getElementColor(element) + '00');
     ctx.save();
     ctx.globalAlpha = 0.45;
     ctx.beginPath();
@@ -459,9 +499,16 @@ function drawMagicCircle() {
     drawElementPattern(ctx, x, y, radius * 0.82, infusedElement);
   }
 
+  // === Pattern di proiezione se infuso ===
+  // Scegli colore: se c'è elemento infuso, usa quello, altrimenti fucsia
+  let projColor = infusedElement ? getElementColor(infusedElement) : "#ff33cc";
+  if (infusedProjection === "proiettile") {
+    drawMagicTrianglePattern(ctx, x, y, radius * 1.2, projColor);
+  }
+
   // === Cerchi principali ===
   ctx.lineWidth = thickness;
-  ctx.strokeStyle = element ? getElementColor(element) : "#ff00ff";
+  ctx.strokeStyle = infusedElement ? getElementColor(infusedElement) : "#ff33cc";
   ctx.beginPath();
   ctx.arc(x, y, radius, 0, 2 * Math.PI);
   ctx.stroke();

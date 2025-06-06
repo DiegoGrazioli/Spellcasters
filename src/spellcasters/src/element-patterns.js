@@ -259,6 +259,184 @@ export function drawElementPattern(ctx, x, y, r, element) {
   ctx.restore();
 }
 
+// Pattern cerchio magico proiettile (fucsia, anello, interno libero)
+export function drawProjectilePattern(ctx, x, y, r) {
+  ctx.save();
+  ctx.translate(x, y);
+  // Anello principale (più grande e meno spesso)
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.82, 0, 2 * Math.PI);
+  ctx.lineWidth = 4.2;
+  ctx.strokeStyle = '#ff33cc';
+  ctx.shadowColor = '#ff33cc';
+  ctx.shadowBlur = 12;
+  ctx.globalAlpha = 0.85;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+  ctx.globalAlpha = 1;
+  // Anello interno sottile
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.68, 0, 2 * Math.PI);
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = '#ff33cc';
+  ctx.globalAlpha = 0.5;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  // Anello esterno sottile
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.95, 0, 2 * Math.PI);
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = '#ff33cc';
+  ctx.globalAlpha = 0.5;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  // Glifi magici (piccoli archi)
+  for (let i = 0; i < 6; i++) {
+    let angle = (Math.PI * 2 / 6) * i;
+    ctx.save();
+    ctx.rotate(angle);
+    ctx.beginPath();
+    ctx.arc(r * 0.82, 0, 12, Math.PI * 0.15, Math.PI * 0.85);
+    ctx.strokeStyle = '#ff33cc';
+    ctx.lineWidth = 1.5;
+    ctx.globalAlpha = 0.7;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+  // Piccoli punti magici
+  for (let i = 0; i < 12; i++) {
+    let angle = (Math.PI * 2 / 12) * i;
+    let px = Math.cos(angle) * r * 0.82;
+    let py = Math.sin(angle) * r * 0.82;
+    ctx.beginPath();
+    ctx.arc(px, py, 2, 0, 2 * Math.PI);
+    ctx.fillStyle = '#ff33cc';
+    ctx.globalAlpha = 0.7;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+}
+
+// Disegna un triangolo magico con ai vertici i cerchi magici del proiettile
+export function drawMagicTrianglePattern(ctx, x, y, r, color = "#ff33cc") {
+  ctx.save();
+  ctx.translate(x, y);
+  const R = r * 0.82 * 0.3; // raggio dei cerchi proiettile, ridotto di un quinto
+  const triangleR = r * 0.92; // distanza dal centro ai vertici del triangolo
+  // Calcola i vertici del triangolo
+  const verts = [];
+  for (let i = 0; i < 3; i++) {
+    const angle = -Math.PI/2 + i * (2 * Math.PI / 3);
+    verts.push({
+      x: Math.cos(angle) * triangleR,
+      y: Math.sin(angle) * triangleR
+    });
+  }
+  // Disegna i cerchi magici del proiettile ai vertici
+  for (let v of verts) {
+    ctx.save();
+    ctx.translate(v.x, v.y);
+    ctx.beginPath();
+    ctx.arc(0, 0, R, 0, 2 * Math.PI);
+    ctx.lineWidth = 4.2;
+    ctx.strokeStyle = color;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 12;
+    ctx.globalAlpha = 0.85;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+    // Anello interno sottile
+    ctx.beginPath();
+    ctx.arc(0, 0, R * 0.63, 0, 2 * Math.PI);
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = 0.5;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    // Anello esterno sottile
+    ctx.beginPath();
+    ctx.arc(0, 0, R * 1, 0, 2 * Math.PI);
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = 0.5;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    // Glifi magici (piccoli archi)
+    for (let i = 0; i < 6; i++) {
+      let angle = (Math.PI * 2 / 6) * i;
+      ctx.save();
+      ctx.rotate(angle);
+      ctx.beginPath();
+      ctx.arc(R, 0, 3, Math.PI * 0.15, Math.PI * 0.85);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
+      ctx.globalAlpha = 0.7;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+    // Piccoli punti magici
+    for (let i = 0; i < 12; i++) {
+      let angle = (Math.PI * 2 / 12) * i;
+      let px = Math.cos(angle) * R;
+      let py = Math.sin(angle) * R;
+      ctx.beginPath();
+      ctx.arc(px, py, 2, 0, 2 * Math.PI);
+      ctx.fillStyle = color;
+      ctx.globalAlpha = 0.7;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+  }
+  // Disegna le linee del triangolo che si fermano alla circonferenza esterna di ogni cerchio
+  for (let i = 0; i < 3; i++) {
+    const v1 = verts[i];
+    const v2 = verts[(i + 1) % 3];
+    // Calcola la direzione dal centro del cerchio v1 verso v2
+    const dx = v2.x - v1.x;
+    const dy = v2.y - v1.y;
+    const dist = Math.hypot(dx, dy);
+    // Punto di partenza: bordo esterno del cerchio v1 verso v2
+    const startX = v1.x + (dx / dist) * R;
+    const startY = v1.y + (dy / dist) * R;
+    // Punto di arrivo: bordo esterno del cerchio v2 verso v1
+    const endX = v2.x - (dx / dist) * R;
+    const endY = v2.y - (dy / dist) * R;
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    ctx.lineTo(endX, endY);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 3.2;
+    ctx.globalAlpha = 0.85;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 8;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+  }
+  // Disegna un triangolo interno sottile
+  const shrink = 0.85; // Fattore di riduzione per il triangolo interno
+  ctx.beginPath();
+  for (let i = 0; i < 3; i++) {
+    const angle = -Math.PI/2 + i * (2 * Math.PI / 3);
+    const xInner = Math.cos(angle) * triangleR * shrink;
+    const yInner = Math.sin(angle) * triangleR * shrink;
+    if (i === 0) ctx.moveTo(xInner, yInner);
+    else ctx.lineTo(xInner, yInner);
+  }
+  ctx.closePath();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.1;
+  ctx.globalAlpha = 0.55;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
 // Funzione di inizializzazione per la preview
 export function drawAllElementPatterns() {
   [

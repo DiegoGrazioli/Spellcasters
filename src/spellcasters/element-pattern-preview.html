@@ -35,10 +35,32 @@
       <canvas id="pat-terra" width="220" height="220"></canvas>
       <div class="pattern-label">Terra</div>
     </div>
+    <div class="pattern-box">
+      <canvas id="pat-proiettile" width="220" height="220"></canvas>
+      <div class="pattern-label">Proiettile</div>
+    </div>
+    <div class="pattern-box">
+      <canvas id="pat-triangolo" width="220" height="220"></canvas>
+      <div class="pattern-label">Triangolo Magico</div>
+    </div>
   </div>
-  <script src="src/element-patterns.js"></script>
-  <script>
-    window.addEventListener('DOMContentLoaded', drawAllElementPatterns);
+  <script type="module">
+    import { drawAllElementPatterns, drawProjectilePattern, drawMagicTrianglePattern } from './src/element-patterns.js';
+    window.addEventListener('DOMContentLoaded', () => {
+      drawAllElementPatterns();
+      // Disegna pattern proiettile
+      const c = document.getElementById('pat-proiettile');
+      if (c) {
+        const ctx = c.getContext('2d');
+        drawProjectilePattern(ctx, c.width/2, c.height/2, 90);
+      }
+      // Disegna pattern triangolo magico
+      const cTri = document.getElementById('pat-triangolo');
+      if (cTri) {
+        const ctxTri = cTri.getContext('2d');
+        drawMagicTrianglePattern(ctxTri, cTri.width/2, cTri.height/2, 90);
+      }
+    });
   </script>
 </body>
 </html>
