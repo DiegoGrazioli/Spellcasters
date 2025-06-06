@@ -320,9 +320,10 @@ export function drawProjectilePattern(ctx, x, y, r) {
 }
 
 // Disegna un triangolo magico con ai vertici i cerchi magici del proiettile
-export function drawMagicTrianglePattern(ctx, x, y, r, color = "#ff33cc") {
+export function drawMagicTrianglePattern(ctx, x, y, r, color = "#ff33cc", rotation = 0) {
   ctx.save();
   ctx.translate(x, y);
+  ctx.rotate(2*rotation);
   const R = r * 0.82 * 0.3; // raggio dei cerchi proiettile, ridotto di un quinto
   const triangleR = r * 0.92; // distanza dal centro ai vertici del triangolo
   // Calcola i vertici del triangolo

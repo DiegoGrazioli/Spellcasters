@@ -539,7 +539,7 @@ function drawMagicCircle() {
   // Scegli colore: se c'è elemento infuso, usa quello, altrimenti fucsia
   let projColor = infusedElement ? getElementColor(infusedElement) : "#ff33cc";
   if (infusedProjection === "proiettile") {
-    drawMagicTrianglePattern(ctx, x, y, radius * 1.2, projColor);
+    drawMagicTrianglePattern(ctx, x, y, radius * 1.2, projColor, -circleRotation);
   }
 
   // === Cerchi principali ===
