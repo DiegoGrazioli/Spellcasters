@@ -30,8 +30,47 @@ let infusedProjection = null;
 
 let particleCount = Number(localStorage.getItem('particleCount')) || 60;
 
+let isActivatingMagicCircle = false;
+let magicCircleDragStart = null;
+let magicCircleDragEnd = null;
+
 // === MANA SYSTEM ===
 // Usa solo il modulo manabar.js per gestire mana, manaMax, manaRecoverSpeed
+
+canvas.addEventListener("mousedown", (e) => {
+  if (e.button !== 0 || !magicCircle) return;
+  // Solo se il mouse è dentro il cerchio magico
+  const dx = e.offsetX - magicCircle.x;
+  const dy = e.offsetY - magicCircle.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist > magicCircle.radius + 20) return;
+
+  // Solo se c'è una proiezione infusa
+  if (magicCircle.proiezione) {
+    isActivatingMagicCircle = true;
+    magicCircleDragStart = { x: magicCircle.x, y: magicCircle.y };
+    magicCircleDragEnd = { x: e.offsetX, y: e.offsetY };
+  }
+});
+
+canvas.addEventListener("mousemove", (e) => {
+  if (isActivatingMagicCircle && magicCircle) {
+    magicCircleDragEnd = { x: e.offsetX, y: e.offsetY };
+  }
+});
+
+canvas.addEventListener("mouseup", (e) => {
+  if (isActivatingMagicCircle && magicCircle) {
+    // Attiva la proiezione con direzione
+    triggerMagicCircleAction(magicCircleDragStart, magicCircleDragEnd);
+    isActivatingMagicCircle = false;
+    magicCircleDragStart = null;
+    magicCircleDragEnd = null;
+  } else if (e.button === 0 && magicCircle) {
+    // Click singolo (senza drag) per effetti statici
+    triggerMagicCircleAction();
+  }
+});
 
 canvas.addEventListener("contextmenu", (e) => {
   e.preventDefault(); // evita il menu del browser
@@ -357,19 +396,16 @@ function showEffect(type) {
 // === PROIEZIONE: PROIETTILE ===
 let projectiles = [];
 
-function launchProjectile(start, end) {
-  // Consuma 2 mana per ogni proiettile
+function launchProjectile(start, end, colorOverride) {
   if (!spendMana(2)) return;
-
-  // Calcola direzione e velocità
   const dx = end.x - start.x;
   const dy = end.y - start.y;
   const dist = Math.hypot(dx, dy);
-  if (dist < 30) return; // ignora tratti troppo corti
+  if (dist < 30) return;
   const speed = 16;
   const vx = (dx / dist) * speed;
   const vy = (dy / dist) * speed;
-  // Effetto particelle mana puro all'evocazione (molto denso)
+  const color = colorOverride || 'rgba(120,220,255,';
   for (let i = 0; i < 80; i++) {
     activeMagicParticles.push({
       x: start.x + (Math.random() - 0.5) * 22,
@@ -378,7 +414,7 @@ function launchProjectile(start, end) {
       alpha: 0.18 + Math.random() * 0.18,
       dx: (Math.random() - 0.5) * 1.5,
       dy: (Math.random() - 0.5) * 1.5,
-      color: 'rgba(120,220,255,',
+      color: color,
     });
   }
   // Calcola la distanza massima fino al bordo canvas
@@ -386,18 +422,18 @@ function launchProjectile(start, end) {
   if (vx !== 0 || vy !== 0) {
     const tx = vx > 0 ? (canvas.width - start.x) / vx : (0 - start.x) / vx;
     const ty = vy > 0 ? (canvas.height - start.y) / vy : (0 - start.y) / vy;
-    // Prendi il più piccolo t positivo
     const tArr = [tx, ty].filter(t => t > 0);
     if (tArr.length > 0) maxT = Math.min(...tArr);
   }
-  const maxLife = Math.floor(maxT);
+  const maxLife = Math.max(30, Math.floor(maxT)); // almeno 30 frame di vita
   projectiles.push({
     x: start.x,
     y: start.y,
     vx,
     vy,
     life: maxLife,
-    alpha: 1
+    alpha: 1,
+    color // <--- salva il colore scelto!
   });
 }
 
@@ -409,21 +445,20 @@ function updateProjectiles() {
     p.life--;
     p.alpha *= 0.97;
 
-    // --- Scia di mana puro ---
-    for (let j = 0; j < 8; j++) { // aumenta la densità
+    // --- Scia di mana puro o elemento ---
+    for (let j = 0; j < 8; j++) {
       activeMagicParticles.push({
         x: p.x + (Math.random() - 0.5) * 18,
         y: p.y + (Math.random() - 0.5) * 18,
-        radius: Math.random() * 4 + 2.5, // più grande
-        alpha: 0.22 + Math.random() * 0.18, // più visibile
+        radius: Math.random() * 4 + 2.5,
+        alpha: 0.22 + Math.random() * 0.18,
         dx: (Math.random() - 0.5) * 1.1,
         dy: (Math.random() - 0.5) * 1.1,
-        color: 'rgba(120,220,255,',
+        color: p.color || 'rgba(120,220,255,', // usa il colore del proiettile!
       });
     }
     // --- Fine scia ---
 
-    // Rimuovi se esce dal canvas o termina la vita
     if (p.life <= 0 || p.x < 0 || p.x > canvas.width || p.y < 0 || p.y > canvas.height) {
       projectiles.splice(i, 1);
     }
@@ -449,6 +484,7 @@ function animate() {
   requestAnimationFrame(animate);
   circleRotation += 0.003;
   drawManaSegments();
+  drawMagicCircleDragTrail();
   // drawTemplate('terra', ctx); // Disegna il template del fuoco per debug
 }
 
@@ -733,4 +769,78 @@ function drawExpBar() {
 function getExpToNext(level) {
   // Esempio: base 100, cresce quadraticamente
   return Math.floor(100 + 30 * Math.pow(level, 1.5));
+}
+
+// Nuova funzione per tracciare la linea durante il drag del cerchio magico
+function drawMagicCircleDragTrail() {
+  if (isActivatingMagicCircle && magicCircleDragStart && magicCircleDragEnd) {
+    ctx.save();
+    ctx.globalAlpha = 0.7;
+    ctx.lineWidth = 8;
+    let color = magicCircle.elemento ? getElementColor(magicCircle.elemento) : "rgba(120,220,255,0.7)";
+    ctx.strokeStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(magicCircleDragStart.x, magicCircleDragStart.y);
+    ctx.lineTo(magicCircleDragEnd.x, magicCircleDragEnd.y);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function triggerMagicCircleAction(start, end) {
+  // Solo elemento
+  if (magicCircle.elemento && !magicCircle.proiezione) {
+    // Effetto statico al centro
+    showEffect(magicCircle.elemento, magicCircle.x, magicCircle.y);
+  }
+  // Solo proiezione
+  else if (!magicCircle.elemento && magicCircle.proiezione && start && end) {
+    // Proiezione con mana puro
+    // --- Particelle iniziali ---
+    for (let i = 0; i < 80; i++) {
+      activeMagicParticles.push({
+        x: start.x + (Math.random() - 0.5) * 22,
+        y: start.y + (Math.random() - 0.5) * 22,
+        radius: Math.random() * 2.2 + 1.2,
+        alpha: 0.18 + Math.random() * 0.18,
+        dx: (Math.random() - 0.5) * 1.5,
+        dy: (Math.random() - 0.5) * 1.5,
+        color: 'rgba(120,220,255,',
+      });
+    }
+    launchProjectile(start, end, "#78dcff"); // colore mana puro
+  }
+  // Entrambi
+  else if (magicCircle.elemento && magicCircle.proiezione && start && end) {
+    // Proiezione con colore dell'elemento
+    let color = getElementColor(magicCircle.elemento);
+    if (!color.endsWith(',')) {
+      // Trasforma #rrggbb in rgba(r,g,b,
+      if (color.startsWith('#') && color.length === 7) {
+        const r = parseInt(color.slice(1, 3), 16);
+        const g = parseInt(color.slice(3, 5), 16);
+        const b = parseInt(color.slice(5, 7), 16);
+        color = `rgba(${r},${g},${b},`;
+      } else {
+        color = color + ',';
+      }
+    }
+    // --- Particelle iniziali ---
+    for (let i = 0; i < 80; i++) {
+      activeMagicParticles.push({
+        x: start.x + (Math.random() - 0.5) * 22,
+        y: start.y + (Math.random() - 0.5) * 22,
+        radius: Math.random() * 2.2 + 1.2,
+        alpha: 0.18 + Math.random() * 0.18,
+        dx: (Math.random() - 0.5) * 1.5,
+        dy: (Math.random() - 0.5) * 1.5,
+        color: color,
+      });
+    }
+    launchProjectile(start, end, color);
+  }
+  // Dopo l'attivazione, resetta il cerchio magico
+  magicCircle = null;
+  infusedElement = null;
+  infusedProjection = null;
 }
