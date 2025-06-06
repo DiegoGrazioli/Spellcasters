@@ -141,6 +141,8 @@
         return;
       }
       localStorage.setItem('currentPlayer', user);
+      setPlayerLevelData(playerData.level, playerData.exp, getExpToNext(playerData.level));
+      drawExpBar();
       window.location.href = 'home.html';
     };
     // Signup

@@ -2,6 +2,7 @@ import DollarRecognizer from "./dollarRecognizer";
 import { drawManaSegments, setManaValues, getManaValues, setCurrentMana, getCurrentMana, getManaMax, getManaRecoverSpeed } from "./Manabar";
 import { setTheme, getTheme } from "./theme.js";
 import { drawElementPattern } from "./element-patterns.js";
+import { getPlayerData, savePlayerData } from "./playerData.js";
 
 const recognizer = new DollarRecognizer();
 
@@ -206,7 +207,7 @@ function showEffect(type) {
     fuoco: () => {
       // Effetto fuoco esistente (particelle che salgono)
       for (let i = 0; i < count; i++) {
-        newParticles.push({
+        fireParticles.push({
           x: mousePos.x + (Math.random() - 0.5) * 40,
           y: mousePos.y + (Math.random() - 0.5) * 40,
           radius: Math.random() * 4 + 2,
@@ -288,7 +289,7 @@ let projectiles = [];
 
 function launchProjectile(start, end) {
   // Consuma 1 mana per ogni proiettile
-  if (!spendMana(1)) return;
+  if (!spendMana(2)) return;
 
   // Calcola direzione e velocità
   const dx = end.x - start.x;
@@ -545,6 +546,8 @@ function spendMana(amount) {
     return false;
   }
   setCurrentMana(getCurrentMana() - amount);
+
+  addPlayerExp(amount);
   return true;
 }
 
@@ -572,7 +575,88 @@ function regenMana() {
     }
   }
   setManaValues({ max: manaMax, current: mana, regen: manaRecoverSpeed, burnout: inBurnout, burnoutT: burnoutTimer });
+  // Salva il mana attuale
+  savePlayerData({ mana });
 }
 
-// Inizializza la barra del mana
-// (Rimosso il vecchio codice DOM-based per la barra del mana, ora gestita da manabar.js e canvas)
+// === SISTEMA DI LEVELING ===
+let playerLevel = 1;
+let playerExp = 0;
+let playerExpToNext = 100;
+
+// Carica dati player all'avvio
+const loadedPlayer = getPlayerData();
+if (loadedPlayer) {
+  playerLevel = loadedPlayer.livello || 1;
+  playerExp = loadedPlayer.esperienza || 0;
+  playerExpToNext = getExpToNext(playerLevel);
+  updateManaStatsForLevel(playerLevel);
+  if (typeof loadedPlayer.mana === 'number') {
+    setCurrentMana(loadedPlayer.mana);
+  }
+  drawExpBar(); // <-- Aggiorna subito la barra exp
+}
+
+// Aggiorna mana massimo e rigenerazione in base al livello
+function updateManaStatsForLevel(level) {
+  const baseMana = 1;
+  const baseRegen = 0.01; // Molto lento a livello 1
+  setManaValues({
+    max: baseMana * level * 10,
+    regen: baseRegen * level * 0.2 // Crescita più evidente con il livello
+  });
+}
+
+// Quando il player guadagna esperienza:
+function addPlayerExp(amount) {
+  playerExp += amount;
+  while (playerExp >= playerExpToNext) {
+    playerExp -= playerExpToNext;
+    playerLevel++;
+    playerExpToNext = getExpToNext(playerLevel);
+    updateManaStatsForLevel(playerLevel);
+    showDebugMessage(`Livello salito! Ora sei livello ${playerLevel}`);
+    // Salva livello ogni volta che cambia
+    savePlayerData({ livello: playerLevel });
+  }
+  // Salva esperienza ogni volta che cambia
+  savePlayerData({ esperienza: playerExp });
+  drawExpBar();
+}
+
+function drawExpBar() {
+  const bar = document.getElementById('exp-bar');
+  const lvl = document.getElementById('exp-level');
+  const glow = document.querySelector('.exp-bar-glow');
+  const barContainer = document.getElementById('exp-bar-container');
+  if (!bar || !lvl || !glow || !barContainer) return;
+  const prevPerc = parseFloat(bar.style.getPropertyValue('width'))/100 || 0;
+  lvl.textContent = playerLevel;
+  const perc = Math.min(1, playerExp / playerExpToNext);
+  bar.style.width = (perc * 100) + "%";
+
+  // Mostra barra exp e livello con transizione
+  barContainer.classList.add('exp-visible');
+  lvl.classList.add('exp-visible');
+  if (window._expBarHideTimeout) clearTimeout(window._expBarHideTimeout);
+  window._expBarHideTimeout = setTimeout(() => {
+    barContainer.classList.remove('exp-visible');
+    lvl.classList.remove('exp-visible');
+  }, 1000);
+
+  // Attiva animazione glow solo se la barra aumenta
+  if (perc > prevPerc) {
+    glow.classList.remove('animate');
+    void glow.offsetWidth;
+    void bar.offsetWidth;
+    setTimeout(() => {
+      glow.classList.add('animate');
+    }, 0);
+    setTimeout(() => glow.classList.remove('animate'), 1100);
+  }
+}
+
+function getExpToNext(level) {
+  // Esempio: base 100, cresce quadraticamente
+  return Math.floor(100 + 30 * Math.pow(level, 1.5));
+}

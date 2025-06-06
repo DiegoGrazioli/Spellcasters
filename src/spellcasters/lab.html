@@ -9,6 +9,13 @@
   <button id="home-btn" class="btn-permanent">Home</button>
   <div id="debug" class="hidden"></div>
   <canvas id="spellCanvas"></canvas>
+  <div id="exp-bar-container">
+    <div id="exp-level">1</div>
+    <div class="exp-bar-bg">
+      <div id="exp-bar"></div>
+      <div class="exp-bar-glow"></div>
+    </div>
+  </div>
   <script type="module">
     import './src/main.js';
     document.getElementById('home-btn').onclick = () => {
