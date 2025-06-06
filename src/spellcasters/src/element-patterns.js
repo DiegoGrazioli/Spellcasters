@@ -260,34 +260,34 @@ export function drawElementPattern(ctx, x, y, r, element) {
 }
 
 // Pattern cerchio magico proiettile (fucsia, anello, interno libero)
-export function drawProjectilePattern(ctx, x, y, r) {
+export function drawProjectilePattern(ctx, x, y, r, color) {
   ctx.save();
   ctx.translate(x, y);
   // Anello principale (più grande e meno spesso)
-  ctx.beginPath();
-  ctx.arc(0, 0, r * 0.82, 0, 2 * Math.PI);
-  ctx.lineWidth = 4.2;
-  ctx.strokeStyle = '#ff33cc';
-  ctx.shadowColor = '#ff33cc';
-  ctx.shadowBlur = 12;
-  ctx.globalAlpha = 0.85;
-  ctx.stroke();
-  ctx.shadowBlur = 0;
-  ctx.globalAlpha = 1;
+  // ctx.beginPath();
+  // ctx.arc(0, 0, r * 0.82 * 0.3, 0, 2 * Math.PI);
+  // ctx.lineWidth = 4.2;
+  // ctx.strokeStyle = '#ff33cc';
+  // ctx.shadowColor = '#ff33cc';
+  // ctx.shadowBlur = 12;
+  // ctx.globalAlpha = 0.85;
+  // ctx.stroke();
+  // ctx.shadowBlur = 0;
+  // ctx.globalAlpha = 1;
   // Anello interno sottile
   ctx.beginPath();
-  ctx.arc(0, 0, r * 0.68, 0, 2 * Math.PI);
-  ctx.lineWidth = 1.5;
-  ctx.strokeStyle = '#ff33cc';
-  ctx.globalAlpha = 0.5;
+  ctx.arc(0, 0, r * 0.68 * 0.3, 0, 2 * Math.PI);
+  ctx.lineWidth = 1.7;
+  ctx.strokeStyle = color;
+  ctx.globalAlpha = 1;
   ctx.stroke();
   ctx.globalAlpha = 1;
   // Anello esterno sottile
   ctx.beginPath();
-  ctx.arc(0, 0, r * 0.95, 0, 2 * Math.PI);
-  ctx.lineWidth = 1.5;
-  ctx.strokeStyle = '#ff33cc';
-  ctx.globalAlpha = 0.5;
+  ctx.arc(0, 0, r * 0.95 * 0.3, 0, 2 * Math.PI);
+  ctx.lineWidth = 1.7;
+  ctx.strokeStyle = color;
+  ctx.globalAlpha = 1;
   ctx.stroke();
   ctx.globalAlpha = 1;
   // Glifi magici (piccoli archi)
@@ -296,9 +296,9 @@ export function drawProjectilePattern(ctx, x, y, r) {
     ctx.save();
     ctx.rotate(angle);
     ctx.beginPath();
-    ctx.arc(r * 0.82, 0, 12, Math.PI * 0.15, Math.PI * 0.85);
-    ctx.strokeStyle = '#ff33cc';
-    ctx.lineWidth = 1.5;
+    ctx.arc(r * 0.82 * 0.3, 0, 6, Math.PI * 0.15, Math.PI * 0.85);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
     ctx.globalAlpha = 0.7;
     ctx.stroke();
     ctx.globalAlpha = 1;
@@ -307,11 +307,11 @@ export function drawProjectilePattern(ctx, x, y, r) {
   // Piccoli punti magici
   for (let i = 0; i < 12; i++) {
     let angle = (Math.PI * 2 / 12) * i;
-    let px = Math.cos(angle) * r * 0.82;
-    let py = Math.sin(angle) * r * 0.82;
+    let px = Math.cos(angle) * r * 0.82 * 0.3;
+    let py = Math.sin(angle) * r * 0.82 * 0.3;
     ctx.beginPath();
     ctx.arc(px, py, 2, 0, 2 * Math.PI);
-    ctx.fillStyle = '#ff33cc';
+    ctx.strokeStyle = color;
     ctx.globalAlpha = 0.7;
     ctx.fill();
     ctx.globalAlpha = 1;
@@ -324,7 +324,7 @@ export function drawMagicTrianglePattern(ctx, x, y, r, color = "#ff33cc", rotati
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(2*rotation);
-  const R = r * 0.82 * 0.3; // raggio dei cerchi proiettile, ridotto di un quinto
+  const R = r * 0.82 * 0.3; // raggio dei cerchi proiettile
   const triangleR = r * 0.92; // distanza dal centro ai vertici del triangolo
   // Calcola i vertici del triangolo
   const verts = [];
@@ -450,4 +450,49 @@ export function drawAllElementPatterns() {
     const ctx = c.getContext('2d');
     drawElementPattern(ctx, c.width/2, c.height/2, 90, el);
   });
+}
+
+export function drawProjectilePolygonPattern(ctx, x, y, r, count, color = "#ff33cc", rotation = 0) {
+  if (count < 1) return;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rotation);
+
+  // Calcola posizione dei vertici
+  const R = r * 0.82 * 0.3;
+  const polyR = r * 0.92;
+  const verts = [];
+  for (let i = 0; i < count; i++) {
+    const angle = -Math.PI/2 + i * (2 * Math.PI / count);
+    verts.push({
+      x: Math.cos(angle) * polyR,
+      y: Math.sin(angle) * polyR
+    });
+  }
+
+  // Disegna i cerchi proiettile
+  for (let v of verts) {
+    drawProjectilePattern(ctx, v.x, v.y, r, color);
+  }
+
+  // Collega i cerchi con linee
+  if (count > 1) {
+    ctx.beginPath();
+    for (let i = 0; i < count; i++) {
+      const v = verts[i];
+      if (i === 0) ctx.moveTo(v.x, v.y);
+      else ctx.lineTo(v.x, v.y);
+    }
+    ctx.closePath();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.2;
+    ctx.globalAlpha = 0.85;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 8;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+  }
+
+  ctx.restore();
 }

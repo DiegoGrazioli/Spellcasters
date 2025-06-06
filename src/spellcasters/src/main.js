@@ -1,7 +1,7 @@
 import DollarRecognizer from "./dollarRecognizer";
 import { drawManaSegments, setManaValues, getManaValues, setCurrentMana, getCurrentMana, getManaMax, getManaRecoverSpeed } from "./Manabar";
 import { setTheme, getTheme } from "./theme.js";
-import { drawElementPattern, drawMagicTrianglePattern } from "./element-patterns.js";
+import { drawElementPattern, drawMagicTrianglePattern, drawProjectilePolygonPattern } from "./element-patterns.js";
 import { getPlayerData, savePlayerData } from "./playerData.js";
 
 const recognizer = new DollarRecognizer();
@@ -46,10 +46,11 @@ canvas.addEventListener("mousedown", (e) => {
   if (dist > magicCircle.radius + 20) return;
 
   // Solo se c'è una proiezione infusa
-  if (magicCircle.proiezione) {
+  if (magicCircle.projectileCount > 0) {
     isActivatingMagicCircle = true;
     magicCircleDragStart = { x: magicCircle.x, y: magicCircle.y };
     magicCircleDragEnd = { x: e.offsetX, y: e.offsetY };
+    magicCircle.projectileCount -= 1;
   }
 });
 
@@ -226,22 +227,27 @@ function recognizeSpell(points) {
     if (magicCircle) {
       // Infusione Proiezione
       if (["proiettile", "triangolo"].includes(result.name)) {
+        if (!magicCircle.projectileCount) magicCircle.projectileCount = 0;
+        magicCircle.projectileCount++;
+        infusedProjection = result.name;
+        showDebugMessage(`Proiettili accumulati: ${magicCircle.projectileCount}`);
+        return result.name;
         // Calcola il centroide del gesto
-        const centroid = points.reduce((acc, p) => ({x: acc.x + p.x, y: acc.y + p.y}), {x:0, y:0});
-        centroid.x /= points.length;
-        centroid.y /= points.length;
-        // Calcola distanza dal centro del cerchio magico
-        const dx = centroid.x - magicCircle.x;
-        const dy = centroid.y - magicCircle.y;
-        const dist = Math.hypot(dx, dy);
+        // const centroid = points.reduce((acc, p) => ({x: acc.x + p.x, y: acc.y + p.y}), {x:0, y:0});
+        // centroid.x /= points.length;
+        // centroid.y /= points.length;
+        // // Calcola distanza dal centro del cerchio magico
+        // const dx = centroid.x - magicCircle.x;
+        // const dy = centroid.y - magicCircle.y;
+        // const dist = Math.hypot(dx, dy);
 
-        // Solo se il gesto è dentro il cerchio magico
-        if (dist < magicCircle.radius) {
-          magicCircle.proiezione = result.name;
-          infusedProjection = result.name;
-          showDebugMessage(`Cerchio magico infuso con proiezione: ${result.name}`);
-          return result.name;
-        }
+        // // Solo se il gesto è dentro il cerchio magico
+        // if (dist < magicCircle.radius) {
+        //   magicCircle.proiezione = result.name;
+        //   infusedProjection = result.name;
+        //   showDebugMessage(`Cerchio magico infuso con proiezione: ${result.name}`);
+        //   return result.name;
+        // }
       }
       // Infusione Elemento
       if (["fuoco", "acqua", "aria", "terra"].includes(result.name)) {
@@ -264,7 +270,7 @@ function recognizeSpell(points) {
     // Priorità 3: Lancio diretto di un elemento o proiezione
     // Questa parte viene eseguita se non è avvenuta un'infusione e non si sta creando un cerchio.
 
-    if (result.name === "proiettile" || result.name === "triangolo") {
+    if (result.name === "proiettile") {
       // Per il lancio diretto di proiettili/triangoli
       if (points.length >= 2) { // Necessario per la direzione del proiettile
         launchProjectile(points[0], points[points.length - 1]);
@@ -301,6 +307,7 @@ function showEffect(type) {
     };
     infusedElement = null; // Resetta lo stato globale per il disegno
     infusedProjection = null; // Resetta lo stato globale per il disegno
+    projectileCount: 0;
     return; // Cerchio magico creato, nessuna particella da questa funzione per esso.
   }
 
@@ -538,8 +545,16 @@ function drawMagicCircle() {
   // === Pattern di proiezione se infuso ===
   // Scegli colore: se c'è elemento infuso, usa quello, altrimenti fucsia
   let projColor = infusedElement ? getElementColor(infusedElement) : "#ff33cc";
-  if (infusedProjection === "proiettile") {
-    drawMagicTrianglePattern(ctx, x, y, radius * 1.2, projColor, -circleRotation);
+  if (magicCircle.projectileCount && magicCircle.projectileCount > 0) {
+    drawProjectilePolygonPattern(
+      ctx,
+      x,
+      y,
+      radius * 1.2,
+      magicCircle.projectileCount,
+      projColor,
+      -2 * circleRotation // o come preferisci la rotazione
+    );
   }
 
   // === Cerchi principali ===
@@ -789,14 +804,12 @@ function drawMagicCircleDragTrail() {
 
 function triggerMagicCircleAction(start, end) {
   // Solo elemento
-  if (magicCircle.elemento && !magicCircle.proiezione) {
-    // Effetto statico al centro
+  if (magicCircle.elemento && (!magicCircle.projectileCount || magicCircle.projectileCount === 0)) {
     showEffect(magicCircle.elemento, magicCircle.x, magicCircle.y);
+    incrementaAffinita(magicCircle.elemento);
   }
   // Solo proiezione
-  else if (!magicCircle.elemento && magicCircle.proiezione && start && end) {
-    // Proiezione con mana puro
-    // --- Particelle iniziali ---
+  else if ((!magicCircle.elemento || magicCircle.elemento === null) && magicCircle.projectileCount > 0 && start && end) {
     for (let i = 0; i < 80; i++) {
       activeMagicParticles.push({
         x: start.x + (Math.random() - 0.5) * 22,
@@ -808,14 +821,13 @@ function triggerMagicCircleAction(start, end) {
         color: 'rgba(120,220,255,',
       });
     }
-    launchProjectile(start, end, "#78dcff"); // colore mana puro
+    launchProjectile(start, end, "#78dcff");
+    incrementaPredisposizione("proiettile");
   }
   // Entrambi
-  else if (magicCircle.elemento && magicCircle.proiezione && start && end) {
-    // Proiezione con colore dell'elemento
+  else if (magicCircle.elemento && magicCircle.projectileCount > 0 && start && end) {
     let color = getElementColor(magicCircle.elemento);
     if (!color.endsWith(',')) {
-      // Trasforma #rrggbb in rgba(r,g,b,
       if (color.startsWith('#') && color.length === 7) {
         const r = parseInt(color.slice(1, 3), 16);
         const g = parseInt(color.slice(3, 5), 16);
@@ -825,7 +837,6 @@ function triggerMagicCircleAction(start, end) {
         color = color + ',';
       }
     }
-    // --- Particelle iniziali ---
     for (let i = 0; i < 80; i++) {
       activeMagicParticles.push({
         x: start.x + (Math.random() - 0.5) * 22,
@@ -838,8 +849,9 @@ function triggerMagicCircleAction(start, end) {
       });
     }
     launchProjectile(start, end, color);
+    incrementaAffinita(magicCircle.elemento);
+    incrementaPredisposizione("proiettile");
   }
-  // Dopo l'attivazione, resetta il cerchio magico
   magicCircle = null;
   infusedElement = null;
   infusedProjection = null;
