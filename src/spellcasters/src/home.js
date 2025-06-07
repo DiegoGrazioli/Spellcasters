@@ -63,7 +63,7 @@ function showHomeScreen(onSelect) {
 
     function createCloud(layer) {
       const baseY = H * (0.45 + 0.18 * layer + Math.random() * 0.18);
-      const vy = (Math.random() - 0.1) * 0.82 + (layer - 1) * 0.9; // velocità verticale, più alta nei layer superiori
+      const vy = (Math.random() - 0.1) * 0.42 + (layer - 1) * 0.2; // velocità verticale, più alta nei layer superiori
       return {
         x: Math.random() * W,
         y: baseY,

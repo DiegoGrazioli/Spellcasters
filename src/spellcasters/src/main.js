@@ -50,7 +50,6 @@ canvas.addEventListener("mousedown", (e) => {
     isActivatingMagicCircle = true;
     magicCircleDragStart = { x: magicCircle.x, y: magicCircle.y };
     magicCircleDragEnd = { x: e.offsetX, y: e.offsetY };
-    magicCircle.projectileCount -= 1;
   }
 });
 
@@ -61,13 +60,14 @@ canvas.addEventListener("mousemove", (e) => {
 });
 
 canvas.addEventListener("mouseup", (e) => {
-  if (isActivatingMagicCircle && magicCircle) {
+  let player = getPlayerData();
+  if (isActivatingMagicCircle && magicCircle && !player.isOverloaded) {
     // Attiva la proiezione con direzione
     triggerMagicCircleAction(magicCircleDragStart, magicCircleDragEnd);
     isActivatingMagicCircle = false;
     magicCircleDragStart = null;
     magicCircleDragEnd = null;
-  } else if (e.button === 0 && magicCircle) {
+  } else if (e.button === 0 && magicCircle && !player.isOverloaded) {
     // Click singolo (senza drag) per effetti statici
     triggerMagicCircleAction();
   }
@@ -244,7 +244,60 @@ function recognizeSpell(points) {
         // // Solo se il gesto è dentro il cerchio magico
         // if (dist < magicCircle.radius) {
         //   magicCircle.proiezione = result.name;
-        //   infusedProjection = result.name;
+        //   infusedProjection = result.name;        // Infusione Proiezione
+        if (["proiettile", "triangolo"].includes(result.name)) {
+          if (!magicCircle.projectileCount) magicCircle.projectileCount = 0;
+          magicCircle.projectileCount++;
+          infusedProjection = result.name;
+          showDebugMessage(`Proiettili accumulati: ${magicCircle.projectileCount}`);
+          return result.name;
+        }
+        
+        // Funzione per lanciare un proiettile
+        function launchProjectile() {
+          if (player.isOverloaded) {
+            showDebugMessage("Sei in overload! Non puoi lanciare proiettili.");
+            return; // Non consuma cariche né spara
+          }
+        
+          if (magicCircle.projectileCount > 0) {
+            // Consuma una carica e lancia il proiettile
+            magicCircle.projectileCount--;
+            generateProjectile(magicCircle.elemento || "standard"); // Usa l'elemento infuso o il colore standard
+            showDebugMessage(`Proiettile lanciato! Cariche rimanenti: ${magicCircle.projectileCount}`);
+          } else {
+            showDebugMessage("Nessuna carica disponibile per lanciare un proiettile.");
+          }
+        }
+        
+        // Funzione per generare un proiettile con il colore corretto
+        function generateProjectile(element) {
+          let projectileColor;
+          switch (element) {
+            case "fuoco":
+              projectileColor = "red";
+              break;
+            case "acqua":
+              projectileColor = "blue";
+              break;
+            case "aria":
+              projectileColor = "white";
+              break;
+            case "terra":
+              projectileColor = "brown";
+              break;
+          }
+        
+          createParticleEffect(projectileColor);
+        }
+        
+        // Funzione per creare l'effetto particellare
+        function createParticleEffect(color) {
+          // Logica per creare particelle con il colore specificato
+          particles.forEach(particle => {
+            particle.color = color;
+          });
+        }
         //   showDebugMessage(`Cerchio magico infuso con proiezione: ${result.name}`);
         //   return result.name;
         // }
@@ -810,22 +863,15 @@ function triggerMagicCircleAction(start, end) {
   }
   // Solo proiezione
   else if ((!magicCircle.elemento || magicCircle.elemento === null) && magicCircle.projectileCount > 0 && start && end) {
-    for (let i = 0; i < 80; i++) {
-      activeMagicParticles.push({
-        x: start.x + (Math.random() - 0.5) * 22,
-        y: start.y + (Math.random() - 0.5) * 22,
-        radius: Math.random() * 2.2 + 1.2,
-        alpha: 0.18 + Math.random() * 0.18,
-        dx: (Math.random() - 0.5) * 1.5,
-        dy: (Math.random() - 0.5) * 1.5,
-        color: 'rgba(120,220,255,',
-      });
-    }
+    // Lancia un singolo proiettile
+    magicCircle.projectileCount--; // Decrementa il conteggio dei proiettili
     launchProjectile(start, end, "#78dcff");
-    incrementaPredisposizione("proiettile");
+    showDebugMessage(`Proiettile lanciato! Cariche rimanenti: ${magicCircle.projectileCount}`);
   }
   // Entrambi
   else if (magicCircle.elemento && magicCircle.projectileCount > 0 && start && end) {
+    // Lancia un singolo proiettile con l'elemento infuso
+    magicCircle.projectileCount--; // Decrementa il conteggio dei proiettili
     let color = getElementColor(magicCircle.elemento);
     if (!color.endsWith(',')) {
       if (color.startsWith('#') && color.length === 7) {
@@ -837,22 +883,14 @@ function triggerMagicCircleAction(start, end) {
         color = color + ',';
       }
     }
-    for (let i = 0; i < 80; i++) {
-      activeMagicParticles.push({
-        x: start.x + (Math.random() - 0.5) * 22,
-        y: start.y + (Math.random() - 0.5) * 22,
-        radius: Math.random() * 2.2 + 1.2,
-        alpha: 0.18 + Math.random() * 0.18,
-        dx: (Math.random() - 0.5) * 1.5,
-        dy: (Math.random() - 0.5) * 1.5,
-        color: color,
-      });
-    }
-    launchProjectile(start, end, color);
-    incrementaAffinita(magicCircle.elemento);
-    incrementaPredisposizione("proiettile");
+    launchProjectile(start, end, color + "1)");
+    showDebugMessage(`Proiettile lanciato con elemento ${magicCircle.elemento}! Cariche rimanenti: ${magicCircle.projectileCount}`);
   }
-  magicCircle = null;
-  infusedElement = null;
-  infusedProjection = null;
+
+  // Cancella il cerchio magico se non ci sono più cariche
+  if (magicCircle.projectileCount <= 0) {
+    magicCircle = null;
+    infusedElement = null;
+    infusedProjection = null;
+  }
 }
