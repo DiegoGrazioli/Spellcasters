@@ -13,41 +13,36 @@ const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
+// === VARIABILI GLOBALI ===
 let casting = false;
 let points = [];
 let particles = [];
 let activeMagicParticles = [];
+let fireParticles = [];
+let projectiles = [];
 
 let magicCircle = null;
 let circleRotation = 0;
-
-let mouseX = 0;
-let mouseY = 0;
-
-let fireParticles = [];
 let infusedElement = null;
 let infusedProjection = null;
-
-let particleCount = Number(localStorage.getItem('particleCount')) || 60;
+let magicCircleToDelete = false;
 
 let isActivatingMagicCircle = false;
 let magicCircleDragStart = null;
 let magicCircleDragEnd = null;
 
-let magicCircleToDelete = false;
+let mouseX = 0;
+let mouseY = 0;
 
-// === MANA SYSTEM ===
-// Usa solo il modulo manabar.js per gestire mana, manaMax, manaRecoverSpeed
+let particleCount = Number(localStorage.getItem('particleCount')) || 60;
 
+// === EVENTI CANVAS ===
 canvas.addEventListener("mousedown", (e) => {
   if (e.button !== 0 || !magicCircle) return;
-  // Solo se il mouse è dentro il cerchio magico
   const dx = e.offsetX - magicCircle.x;
   const dy = e.offsetY - magicCircle.y;
   const dist = Math.hypot(dx, dy);
   if (dist > magicCircle.radius + 20) return;
-
-  // Solo se c'è una proiezione infusa
   if (magicCircle.projectileCount > 0) {
     isActivatingMagicCircle = true;
     magicCircleDragStart = { x: magicCircle.x, y: magicCircle.y };
@@ -56,55 +51,16 @@ canvas.addEventListener("mousedown", (e) => {
 });
 
 canvas.addEventListener("mousemove", (e) => {
-  if (isActivatingMagicCircle && magicCircle) {
-    magicCircleDragEnd = { x: e.offsetX, y: e.offsetY };
-  }
-});
-
-canvas.addEventListener("mouseup", (e) => {
-  let player = getPlayerData();
-  if (isActivatingMagicCircle && magicCircle && !player.isOverloaded) {
-    // Attiva la proiezione con direzione
-    triggerMagicCircleAction(magicCircleDragStart, magicCircleDragEnd);
-    isActivatingMagicCircle = false;
-    magicCircleDragStart = null;
-    magicCircleDragEnd = null;
-  } else if (e.button === 0 && magicCircle && !player.isOverloaded) {
-    // Click singolo (senza drag) per effetti statici
-    triggerMagicCircleAction();
-  }
-});
-
-canvas.addEventListener("contextmenu", (e) => {
-  e.preventDefault(); // evita il menu del browser
-
-  if (!magicCircle) return;
-
-  const rect = canvas.getBoundingClientRect();
-  const mx = e.clientX - rect.left;
-  const my = e.clientY - rect.top;
-
-  const dx = mx - magicCircle.x;
-  const dy = my - magicCircle.y;
-  const dist = Math.hypot(dx, dy);
-
-  if (dist >= magicCircle.radius - 120 && dist <= magicCircle.radius) {
-    magicCircle = null; // cancellazione!
-    showDebugMessage("Cerchio magico cancellato");
-  }
-});
-
-canvas.addEventListener("mousemove", (e) => {
   const rect = canvas.getBoundingClientRect();
   mouseX = e.clientX - rect.left;
   mouseY = e.clientY - rect.top;
-  
+  if (isActivatingMagicCircle && magicCircle) {
+    magicCircleDragEnd = { x: e.offsetX, y: e.offsetY };
+  }
   if (casting) {
     const point = { x: mouseX, y: mouseY };
     points.push(point);
     particles.push(createParticle(point.x, point.y));
-    
-    // Feedback visivo durante il disegno
     if (points.length > 5) {
       const partialResult = recognizer.recognize(points.slice(-10));
       if (partialResult.score > 0.5) {
@@ -118,40 +74,54 @@ canvas.addEventListener("mousemove", (e) => {
   }
 });
 
-function getElementColor(element) {
-  const colors = {
-    fuoco: '#ff5555',
-    acqua: '#5555ff',
-    aria: '#aaaaee',
-    terra: '#55aa55',
-    fulmine: '#ffff55',
-    luce: '#ffffff'
-  };
-  return colors[element] || '#ffffff';
-}
+canvas.addEventListener("mouseup", (e) => {
+  let player = getPlayerData();
+  if (isActivatingMagicCircle && magicCircle && !player.isOverloaded) {
+    triggerMagicCircleAction(magicCircleDragStart, magicCircleDragEnd);
+    isActivatingMagicCircle = false;
+    magicCircleDragStart = null;
+    magicCircleDragEnd = null;
+  } else if (e.button === 0 && magicCircle && !player.isOverloaded) {
+    triggerMagicCircleAction();
+  }
+});
 
+canvas.addEventListener("contextmenu", (e) => {
+  e.preventDefault();
+  if (!magicCircle) return;
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  const dx = mx - magicCircle.x;
+  const dy = my - magicCircle.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist >= magicCircle.radius - 120 && dist <= magicCircle.radius) {
+    magicCircle = null;
+    showDebugMessage("Cerchio magico cancellato");
+  }
+});
+
+// === EVENTI TASTIERA ===
 window.addEventListener("keydown", (e) => {
   if ((e.key === "z" || e.key === "Z") && !casting) {
     casting = true;
     points = [];
   }
-  if (e.key === 'n' || e.key === 'N') {
-    setTheme('night');
-  }
-  if (e.key === 'g' || e.key === 'G') {
-    setTheme('day');
-  }
+  if (e.key === 'n' || e.key === 'N') setTheme('night');
+  if (e.key === 'g' || e.key === 'G') setTheme('day');
 });
 
 window.addEventListener("keyup", (e) => {
   if (e.key === "z" || e.key === "Z") {
     casting = false;
-    // Chiama sempre recognizeSpell per gestire il simbolo disegnato
     recognizeSpell(points);
     points = [];
   }
 });
 
+window.addEventListener("resize", resizeCanvas);
+
+// === PARTICELLE GENERICHE ===
 function createParticle(x, y) {
   return {
     x,
@@ -184,180 +154,129 @@ function drawParticles() {
   }
 }
 
-function drawPath() {
-  if (points.length < 2) return;
+// === PARTICELLE MAGICHE E FUOCO ===
+function drawFireParticles() {
+  for (let p of fireParticles) {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.radius, 0, 2 * Math.PI);
+    ctx.fillStyle = p.color;
+    ctx.fill();
+    p.y += p.dy;
+    p.alpha -= 0.015;
+    p.radius *= 0.98;
+  }
+  fireParticles = fireParticles.filter(p => p.alpha > 0 && p.radius > 0.5);
+}
+
+function drawMagicParticles() {
+  for (let i = activeMagicParticles.length - 1; i >= 0; i--) {
+    const p = activeMagicParticles[i];
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.radius, 0, 2 * Math.PI);
+    ctx.fillStyle = p.color + p.alpha + ")";
+    ctx.fill();
+    p.x += p.dx;
+    p.y += p.dy;
+    p.alpha -= 0.01;
+    p.radius *= 0.99;
+    if (p.alpha <= 0.01 || p.radius <= 0.2) {
+      activeMagicParticles.splice(i, 1);
+    }
+  }
+}
+
+// === CERCHIO MAGICO E PROIEZIONI ===
+function drawMagicCircle() {
+  if (!magicCircle) return;
+  const { x, y, radius, thickness, element } = magicCircle;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(circleRotation);
+  ctx.translate(-x, -y);
+
+  // Glow radiale
+  if (infusedElement && element) {
+    const glowRadius = radius + 24;
+    const grad = ctx.createRadialGradient(x, y, 0, x, y, glowRadius);
+    grad.addColorStop(0, getElementColor(element) + 'cc');
+    grad.addColorStop(0.45, getElementColor(element) + '44');
+    grad.addColorStop(0.85, getElementColor(element) + '11');
+    grad.addColorStop(1, getElementColor(element) + '00');
+    ctx.save();
+    ctx.globalAlpha = 0.45;
+    ctx.beginPath();
+    ctx.arc(x, y, glowRadius, 0, 2 * Math.PI);
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // Pattern elementale
+  if (infusedElement) {
+    drawElementPattern(ctx, x, y, radius * 0.82, infusedElement);
+  }
+
+  // Pattern di proiezione
+  let projColor = infusedElement ? getElementColor(infusedElement) : "#ff33cc";
+  if (magicCircle.projectileCount && magicCircle.projectileCount > 0) {
+    drawProjectilePolygonPattern(
+      ctx,
+      x,
+      y,
+      radius * 1.2,
+      magicCircle.projectileCount,
+      projColor,
+      -2 * circleRotation
+    );
+  }
+
+  // Cerchi principali
+  ctx.lineWidth = thickness;
+  ctx.strokeStyle = infusedElement ? getElementColor(infusedElement) : "#ff33cc";
   ctx.beginPath();
-  ctx.moveTo(points[0].x, points[0].y);
-  for (let i = 1; i < points.length; i++) {
-    ctx.lineTo(points[i].x, points[i].y);
-  }
-  ctx.strokeStyle = "rgba(180, 240, 255, 0.6)";
-  ctx.lineWidth = 3;
+  ctx.arc(x, y, radius, 0, 2 * Math.PI);
   ctx.stroke();
-}
+  ctx.beginPath();
+  ctx.arc(x, y, radius + 20, 0, 2 * Math.PI);
+  ctx.stroke();
 
-function incrementaAffinita(elemento) {
-  let player = getPlayerData();
-  if (!player) return;
-  if (!player.affinita) player.affinita = {};
-  if (!player.affinita[elemento]) player.affinita[elemento] = 0;
-  player.affinita[elemento]++;
-  savePlayerData({ affinita: player.affinita });
-  // Aggiorna anche l'array dei player in localStorage (retrocompatibilità con info player)
-  let players = JSON.parse(localStorage.getItem('players') || '[]');
-  const idx = players.findIndex(p => p.username === player.username);
-  if (idx !== -1) {
-    players[idx].affinita = player.affinita;
-    localStorage.setItem('players', JSON.stringify(players));
+  // Segmenti radiali
+  ctx.lineWidth = 1;
+  const numSegments = 24;
+  for (let i = 0; i < numSegments; i++) {
+    const angle = (2 * Math.PI / numSegments) * i;
+    const innerX = x + Math.cos(angle) * radius;
+    const innerY = y + Math.sin(angle) * radius;
+    const outerX = x + Math.cos(angle) * (radius + 20);
+    const outerY = y + Math.sin(angle) * (radius + 20);
+    ctx.beginPath();
+    ctx.moveTo(outerX, outerY);
+    ctx.lineTo(innerX, innerY);
+    ctx.stroke();
   }
-  // Log affinità in console
-  console.log('[Affinità attuali]');
-  Object.entries(player.affinita).forEach(([k, v]) => {
-    console.log(`${k}: ${v}`);
-  });
-}
+  ctx.restore();
 
-// Modifica recognizeSpell per aggiornare l'affinità
-function recognizeSpell(points) {
-  if (points.length < 10) return null;
-  const result = recognizer.recognize(points);
-
-  if (result.score > 0.60) {
-    showDebugMessage(`Simbolo riconosciuto: ${result.name} (${Math.round(result.score * 100)}% confidenza)`);
-
-    // Priorità 1: Infusione se un cerchio magico è attivo
-    if (magicCircle) {
-      // Infusione Proiezione
-      if (["proiettile", "triangolo"].includes(result.name)) {
-        if (!magicCircle.projectileCount) magicCircle.projectileCount = 0;
-        magicCircle.projectileCount++;
-        infusedProjection = result.name;
-        showDebugMessage(`Proiettili accumulati: ${magicCircle.projectileCount}`);
-        return result.name;
-        // Calcola il centroide del gesto
-        // const centroid = points.reduce((acc, p) => ({x: acc.x + p.x, y: acc.y + p.y}), {x:0, y:0});
-        // centroid.x /= points.length;
-        // centroid.y /= points.length;
-        // // Calcola distanza dal centro del cerchio magico
-        // const dx = centroid.x - magicCircle.x;
-        // const dy = centroid.y - magicCircle.y;
-        // const dist = Math.hypot(dx, dy);
-
-        // // Solo se il gesto è dentro il cerchio magico
-        // if (dist < magicCircle.radius) {
-        //   magicCircle.proiezione = result.name;
-        //   infusedProjection = result.name;        // Infusione Proiezione
-        if (["proiettile", "triangolo"].includes(result.name)) {
-          if (!magicCircle.projectileCount) magicCircle.projectileCount = 0;
-          magicCircle.projectileCount++;
-          infusedProjection = result.name;
-          showDebugMessage(`Proiettili accumulati: ${magicCircle.projectileCount}`);
-          return result.name;
-        }
-        
-        // Funzione per lanciare un proiettile
-        function launchProjectile() {
-          if (player.isOverloaded) {
-            showDebugMessage("Sei in overload! Non puoi lanciare proiettili.");
-            return; // Non consuma cariche né spara
-          }
-        
-          if (magicCircle.projectileCount > 0) {
-            // Consuma una carica e lancia il proiettile
-            magicCircle.projectileCount--;
-            generateProjectile(magicCircle.elemento || "standard"); // Usa l'elemento infuso o il colore standard
-            showDebugMessage(`Proiettile lanciato! Cariche rimanenti: ${magicCircle.projectileCount}`);
-          } else {
-            showDebugMessage("Nessuna carica disponibile per lanciare un proiettile.");
-          }
-        }
-        
-        // Funzione per generare un proiettile con il colore corretto
-        function generateProjectile(element) {
-          let projectileColor;
-          switch (element) {
-            case "fuoco":
-              projectileColor = "red";
-              break;
-            case "acqua":
-              projectileColor = "blue";
-              break;
-            case "aria":
-              projectileColor = "white";
-              break;
-            case "terra":
-              projectileColor = "brown";
-              break;
-          }
-        
-          createParticleEffect(projectileColor);
-        }
-        
-        // Funzione per creare l'effetto particellare
-        function createParticleEffect(color) {
-          // Logica per creare particelle con il colore specificato
-           for (let i = 0; i < 20; i++) {
-              particles.push({
-                x: mouseX,
-                y: mouseY,
-                radius: Math.random() * 2 + 1,
-                alpha: 1,
-                dx: (Math.random() - 0.5) * 1.5,
-                dy: (Math.random() - 0.5) * 1.5,
-                color: color
-              });
-            }
-        }
-        //   showDebugMessage(`Cerchio magico infuso con proiezione: ${result.name}`);
-        //   return result.name;
-        // }
-      }
-      // Infusione Elemento
-      if (["fuoco", "acqua", "aria", "terra"].includes(result.name)) {
-        magicCircle.elemento = result.name;
-        infusedElement = result.name; // Aggiorna stato globale per il disegno del cerchio
-        showDebugMessage(`Cerchio magico infuso con elemento: ${result.name}`);
-        incrementaAffinita(result.name); // L'affinità aumenta anche con l'infusione
-        // NESSUN costo di mana o effetto particellare per l'INFUSIONE
-        return result.name; // Esce dalla funzione, infusione completata
-      }
-    }
-
-    // Priorità 2: Creazione del cerchio magico stesso (se non c'era infusione e il simbolo è "cerchio")
-    if (result.name === "cerchio") {
-      showEffect(result.name); // Chiama showEffect per creare l'oggetto magicCircle
-      // NESSUN costo di mana per creare il cerchio in questa fase
-      return result.name;
-    }
-
-    // Priorità 3: Lancio diretto di un elemento o proiezione
-    // Questa parte viene eseguita se non è avvenuta un'infusione e non si sta creando un cerchio.
-
-    if (result.name === "proiettile") {
-      // Per il lancio diretto di proiettili/triangoli
-      if (points.length >= 2) { // Necessario per la direzione del proiettile
-        launchProjectile(points[0], points[points.length - 1]);
-        // La funzione launchProjectile gestisce già il costo di mana e le particelle
-      }
-    } else if (["fuoco", "acqua", "aria", "terra"].includes(result.name)) {
-      // Per il lancio diretto di elementi
-      showEffect(result.name); // Mostra particelle per elementi
-      incrementaAffinita(result.name);
-      spendMana(1); // Costo per lanciare un elemento direttamente
-    } else {
-      // Gestisci altri tipi di magie dirette se necessario, o un effetto generico
-      showEffect(result.name); // Potrebbe non fare nulla se il tipo non è gestito in showEffect
-    }
-    return result.name;
+  // Particelle fucsia fluttuanti attorno al cerchio
+  for (let i = 0; i < 4; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const dist = radius + 10 + Math.random() * 15;
+    const px = x + Math.cos(angle + circleRotation) * dist;
+    const py = y + Math.sin(angle + circleRotation) * dist;
+    activeMagicParticles.push({
+      x: px,
+      y: py,
+      radius: Math.random() * 1.5 + 0.5,
+      alpha: 0.1 + Math.random() * 0.1,
+      dx: (Math.random() - 0.5) * 0.3,
+      dy: (Math.random() - 0.5) * 0.3,
+      color: element ? getElementColor(element) + "," : "rgba(255, 0, 255,",
+    });
   }
-
-  showDebugMessage('Simbolo non riconosciuto', 1000);
-  return null;
 }
 
 function showEffect(type) {
   const mousePos = { x: mouseX, y: mouseY };
-  let newParticles = []; // Sarà popolato dagli effetti degli elementi
+  let newParticles = [];
   const count = particleCount;
 
   if (type === "cerchio") {
@@ -366,56 +285,49 @@ function showEffect(type) {
       y: mousePos.y,
       radius: 120,
       thickness: 3
-      // element e proiezione verranno impostati durante l'infusione in recognizeSpell
     };
-    infusedElement = null; // Resetta lo stato globale per il disegno
-    infusedProjection = null; // Resetta lo stato globale per il disegno
+    infusedElement = null;
+    infusedProjection = null;
     projectileCount: 0;
-    return; // Cerchio magico creato, nessuna particella da questa funzione per esso.
+    return;
   }
-
-  // Il resto di showEffect è per gli effetti particellari degli elementi lanciati DIRETTAMENTE.
-  // La logica di infusione che era qui è ora gestita completamente da recognizeSpell.
 
   const effects = {
     fuoco: () => {
-      // Effetto fuoco esistente (particelle che salgono)
       for (let i = 0; i < count; i++) {
         fireParticles.push({
           x: mousePos.x + (Math.random() - 0.5) * 40,
           y: mousePos.y + (Math.random() - 0.5) * 40,
           radius: Math.random() * 4 + 2,
           alpha: 1,
-          dy: Math.random() * -2 - 0.5, // Verso l'alto
+          dy: Math.random() * -2 - 0.5,
           dx: (Math.random() - 0.5) * 0.5,
           color: `rgba(${200 + Math.random() * 55}, ${50 + Math.random() * 80}, 0, ${Math.random() * 0.8 + 0.2})`,
-          life: 100, // Durata in frame
-          decay: 0.015 // Velocità di decadimento
+          life: 100,
+          decay: 0.015
         });
       }
     },
     acqua: () => {
-      // Effetto acqua che sgocciola (simile al fuoco ma verso il basso)
       for (let i = 0; i < count * 1.2; i++) {
         newParticles.push({
           x: mousePos.x + (Math.random() - 0.5) * 30,
           y: mousePos.y + (Math.random() - 0.5) * 30,
           radius: Math.random() * 3 + 1,
           alpha: 0.8,
-          dy: Math.random() * 2 + 1, // Verso il basso
+          dy: Math.random() * 2 + 1,
           dx: (Math.random() - 0.5) * 0.3,
           color: `rgba(${100 + Math.random() * 50}, ${150 + Math.random() * 100}, 255, ${Math.random() * 0.6 + 0.3})`,
           life: 80,
           decay: 0.01,
-          gravity: 0.1 // Aggiunta di gravità per l'effetto goccia
+          gravity: 0.1
         });
       }
     },
     aria: () => {
-      // Effetto raffica di vento (particelle veloci e disperse)
       for (let i = 0; i < count * 1.5; i++) {
-        const angle = Math.random() * Math.PI * 2; // Direzione casuale
-        const speed = Math.random() * 3 + 2; // Velocità base
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 3 + 2;
         newParticles.push({
           x: mousePos.x,
           y: mousePos.y,
@@ -423,15 +335,14 @@ function showEffect(type) {
           alpha: 0.6,
           dy: Math.sin(angle) * speed,
           dx: Math.cos(angle) * speed,
-          color: `rgba(170,170,238,`, // Colore aria coerente
+          color: `rgba(170,170,238,`,
           life: 60,
           decay: 0.02,
-          swirl: Math.random() * 0.2 - 0.1 // Effetto vortice
+          swirl: Math.random() * 0.2 - 0.1
         });
       }
     },
     terra: () => {
-      // Effetto terra (particelle pesanti e vibranti)
       for (let i = 0; i < count * 0.8; i++) {
         const r = Math.floor(180 + Math.random() * 40);
         const g = Math.floor(160 + Math.random() * 30);
@@ -441,31 +352,26 @@ function showEffect(type) {
           y: mousePos.y + (Math.random() - 0.5) * 30,
           radius: Math.random() * 4 + 2,
           alpha: 1,
-          dy: Math.random() * 0.2 - 0.1, // Movimento minimo
+          dy: Math.random() * 0.2 - 0.1,
           dx: Math.random() * 0.2 - 0.1,
-          color: `rgba(${r},${g},${b},`, // Colore terra coerente
-          life: 150, // Durata maggiore
-          decay: 0.005, // Decadimento più lento
-          baseX: mousePos.x + (Math.random() - 0.5) * 40, // Posizione base per vibrazione
+          color: `rgba(${r},${g},${b},`,
+          life: 150,
+          decay: 0.005,
+          baseX: mousePos.x + (Math.random() - 0.5) * 40,
           baseY: mousePos.y + (Math.random() - 0.5) * 40,
-          vibrateSpeed: Math.random() * 0.1 + 0.05 // Velocità vibrazione
+          vibrateSpeed: Math.random() * 0.1 + 0.05
         });
       }
     }
-    // NON ci sono "proiettile" o "triangolo" qui, perché launchProjectile gestisce le proprie particelle.
   };
 
   if (effects[type]) {
-    effects[type](); // Questo popolerà newParticles se è un elemento
-    activeMagicParticles.push(...newParticles); // Aggiungi all'array globale delle particelle
+    effects[type]();
+    activeMagicParticles.push(...newParticles);
   }
-  // Se il tipo non è un elemento e non è "cerchio", nessuna particella specifica viene generata da questa funzione.
 }
 
-
-// === PROIEZIONE: PROIETTILE ===
-let projectiles = [];
-
+// === PROIEZIONI: PROIETTILE ===
 function launchProjectile(start, end, colorOverride, tipoProiezione = "proiettile") {
   if (!spendMana(2)) return;
   const dx = end.x - start.x;
@@ -487,7 +393,6 @@ function launchProjectile(start, end, colorOverride, tipoProiezione = "proiettil
       color: color,
     });
   }
-  // Calcola la distanza massima fino al bordo canvas
   let maxT = 1;
   if (vx !== 0 || vy !== 0) {
     const tx = vx > 0 ? (canvas.width - start.x) / vx : (0 - start.x) / vx;
@@ -495,7 +400,7 @@ function launchProjectile(start, end, colorOverride, tipoProiezione = "proiettil
     const tArr = [tx, ty].filter(t => t > 0);
     if (tArr.length > 0) maxT = Math.min(...tArr);
   }
-  const maxLife = Math.max(30, Math.floor(maxT)); // almeno 30 frame di vita
+  const maxLife = Math.max(30, Math.floor(maxT));
   projectiles.push({
     x: start.x,
     y: start.y,
@@ -503,8 +408,8 @@ function launchProjectile(start, end, colorOverride, tipoProiezione = "proiettil
     vy,
     life: maxLife,
     alpha: 1,
-    color, // <--- salva il colore scelto!
-    tipo: tipoProiezione // salva il tipo di proiezione
+    color,
+    tipo: tipoProiezione
   });
   incrementaProiezioneUsata("proiettile");
 }
@@ -516,8 +421,6 @@ function updateProjectiles() {
     p.y += p.vy;
     p.life--;
     p.alpha *= 0.97;
-
-    // --- Scia di mana puro o elemento ---
     for (let j = 0; j < 8; j++) {
       activeMagicParticles.push({
         x: p.x + (Math.random() - 0.5) * 18,
@@ -526,11 +429,9 @@ function updateProjectiles() {
         alpha: 0.22 + Math.random() * 0.18,
         dx: (Math.random() - 0.5) * 1.1,
         dy: (Math.random() - 0.5) * 1.1,
-        color: p.color || 'rgba(120,220,255,', // usa il colore del proiettile!
+        color: p.color || 'rgba(120,220,255,',
       });
     }
-    // --- Fine scia ---
-
     if (p.life <= 0 || p.x < 0 || p.x > canvas.width || p.y < 0 || p.y > canvas.height) {
       projectiles.splice(i, 1);
     }
@@ -538,327 +439,125 @@ function updateProjectiles() {
 }
 
 function drawProjectiles() {
-  
+  // Se vuoi disegnare i proiettili stessi (es. una sfera), aggiungi qui
 }
 
-// === AGGIORNA E DISEGNA PROIEZIONI NEL LOOP ===
-function animate() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  if (casting) drawPath();
-  updateParticles();
-  drawParticles();
-  drawFireParticles();
-  drawMagicParticles();
-  drawMagicCircle();
-  updateProjectiles();
-  drawProjectiles();
-  regenMana();
-  requestAnimationFrame(animate);
-  circleRotation += 0.003;
-  drawManaSegments();
-  drawMagicCircleDragTrail();
-  // drawTemplate('terra', ctx); // Disegna il template del fuoco per debug
+// === LOGICA CERCHIO MAGICO ===
+function triggerMagicCircleAction(start, end) {
+  let player = getPlayerData();
+  if (!player.proiettiliLanciati) player.proiettiliLanciati = 0;
 
-  if (magicCircleToDelete) {
-    magicCircle = null;
-    infusedElement = null;
-    infusedProjection = null;
-    magicCircleToDelete = false;
+  // Solo elemento
+  if (magicCircle.elemento && (!magicCircle.projectileCount || magicCircle.projectileCount === 0)) {
+    showEffect(magicCircle.elemento, magicCircle.x, magicCircle.y);
+    incrementaAffinita(magicCircle.elemento);
   }
-}
-
-// PARTICELLE ELEMENTALI
-
-function drawFireParticles() {
-  for (let p of fireParticles) {
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.radius, 0, 2 * Math.PI);
-    ctx.fillStyle = p.color;
-    ctx.fill();
-    p.y += p.dy;
-    p.alpha -= 0.015;
-    p.radius *= 0.98;
+  // Solo proiezione
+  else if ((!magicCircle.elemento || magicCircle.elemento === null) && magicCircle.projectileCount > 0 && start && end) {
+    magicCircle.projectileCount--;
+    launchProjectile(start, end, "#78dcff");
+    incrementaProiezioneUsata("proiettile");
+    showDebugMessage(`Proiettile lanciato! Cariche rimanenti: ${magicCircle.projectileCount}`);
+    if (magicCircle.projectileCount <= 0) {
+      magicCircleToDelete = true;
+    }
   }
-
-  fireParticles = fireParticles.filter(p => p.alpha > 0 && p.radius > 0.5);
-}
-
-function drawMagicCircle() {
-  if (!magicCircle) return;
-
-  const { x, y, radius, thickness, element } = magicCircle;
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(circleRotation);
-  ctx.translate(-x, -y);
-
-  // === Glow radiale dal centro per cerchio magico infuso ===
-  if (infusedElement && element) {
-    const glowRadius = radius + 24;
-    const grad = ctx.createRadialGradient(x, y, 0, x, y, glowRadius);
-    grad.addColorStop(0, getElementColor(element) + 'cc');
-    grad.addColorStop(0.45, getElementColor(element) + '44');
-    grad.addColorStop(0.85, getElementColor(element) + '11');
-    grad.addColorStop(1, getElementColor(element) + '00');
-    ctx.save();
-    ctx.globalAlpha = 0.45;
-    ctx.beginPath();
-    ctx.arc(x, y, glowRadius, 0, 2 * Math.PI);
-    ctx.fillStyle = grad;
-    ctx.fill();
-    ctx.restore();
-  }
-
-  // === Pattern elementale se infuso ===
-  if (infusedElement) {
-    drawElementPattern(ctx, x, y, radius * 0.82, infusedElement);
-  }
-
-  // === Pattern di proiezione se infuso ===
-  // Scegli colore: se c'è elemento infuso, usa quello, altrimenti fucsia
-  let projColor = infusedElement ? getElementColor(infusedElement) : "#ff33cc";
-  if (magicCircle.projectileCount && magicCircle.projectileCount > 0) {
-    drawProjectilePolygonPattern(
-      ctx,
-      x,
-      y,
-      radius * 1.2,
-      magicCircle.projectileCount,
-      projColor,
-      -2 * circleRotation // o come preferisci la rotazione
-    );
-  }
-
-  // === Cerchi principali ===
-  ctx.lineWidth = thickness;
-  ctx.strokeStyle = infusedElement ? getElementColor(infusedElement) : "#ff33cc";
-  ctx.beginPath();
-  ctx.arc(x, y, radius, 0, 2 * Math.PI);
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.arc(x, y, radius + 20, 0, 2 * Math.PI);
-  ctx.stroke();
-
-  // === Segmenti radiali più sottili ===
-  ctx.lineWidth = 1;
-  const numSegments = 24;
-  for (let i = 0; i < numSegments; i++) {
-    const angle = (2 * Math.PI / numSegments) * i;
-    const innerX = x + Math.cos(angle) * radius;
-    const innerY = y + Math.sin(angle) * radius;
-    const outerX = x + Math.cos(angle) * (radius + 20);
-    const outerY = y + Math.sin(angle) * (radius + 20);
-
-    ctx.beginPath();
-    ctx.moveTo(outerX, outerY);
-    ctx.lineTo(innerX, innerY);
-    ctx.stroke();
-  }
-
-  ctx.restore();
-
-  // === Particelle fucsia fluttuanti attorno al cerchio ===
-  for (let i = 0; i < 4; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const dist = radius + 10 + Math.random() * 15;
-    const px = x + Math.cos(angle + circleRotation) * dist;
-    const py = y + Math.sin(angle + circleRotation) * dist;
-
-    activeMagicParticles.push({
-      x: px,
-      y: py,
-      radius: Math.random() * 1.5 + 0.5,
-      alpha: 0.1 + Math.random() * 0.1,
-      dx: (Math.random() - 0.5) * 0.3,
-      dy: (Math.random() - 0.5) * 0.3,
-      color: element ? getElementColor(element) + "," : "rgba(255, 0, 255,",
-    });
-  }
-}
-
-
-function drawMagicParticles() {
-  for (let i = activeMagicParticles.length - 1; i >= 0; i--) {
-    const p = activeMagicParticles[i];
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.radius, 0, 2 * Math.PI);
-    ctx.fillStyle = p.color + p.alpha + ")";
-    ctx.fill();
-    p.x += p.dx;
-    p.y += p.dy;
-    p.alpha -= 0.01;
-    p.radius *= 0.99;
-    if (p.alpha <= 0.01 || p.radius <= 0.2) {
-      activeMagicParticles.splice(i, 1); // rimuovi se svanita
+  // Entrambi
+  else if (magicCircle.elemento && magicCircle.projectileCount > 0 && start && end) {
+    let color = getElementColor(magicCircle.elemento);
+    if (!color.endsWith(',')) {
+      if (color.startsWith('#') && color.length === 7) {
+        const r = parseInt(color.slice(1, 3), 16);
+        const g = parseInt(color.slice(3, 5), 16);
+        const b = parseInt(color.slice(5, 7), 16);
+        color = `rgba(${r},${g},${b},`;
+      } else {
+        color = color + ',';
+      }
+    }
+    launchProjectile(start, end, color + "1)");
+    magicCircle.projectileCount--;
+    incrementaProiezioneUsata(magicCircle.infusedProjection || "proiettile");
+    showDebugMessage(`Proiettile lanciato con elemento ${magicCircle.elemento}! Cariche rimanenti: ${magicCircle.projectileCount}`);
+    if (magicCircle.projectileCount <= 0) {
+      magicCircleToDelete = true;
     }
   }
 }
 
-// FINE PARTICELLE ELEMENTALI
+// === RICONOSCIMENTO GESTURE ===
+function recognizeSpell(points) {
+  if (points.length < 10) return null;
+  const result = recognizer.recognize(points);
 
-animate();
-window.addEventListener("resize", resizeCanvas);
+  if (result.score > 0.60) {
+    showDebugMessage(`Simbolo riconosciuto: ${result.name} (${Math.round(result.score * 100)}% confidenza)`);
+    if (magicCircle) {
+      if (["proiettile", "triangolo"].includes(result.name)) {
+        if (!magicCircle.projectileCount) magicCircle.projectileCount = 0;
+        magicCircle.projectileCount++;
+        infusedProjection = result.name;
+        showDebugMessage(`Proiettili accumulati: ${magicCircle.projectileCount}`);
+        return result.name;
+      }
+      if (["fuoco", "acqua", "aria", "terra"].includes(result.name)) {
+        magicCircle.elemento = result.name;
+        infusedElement = result.name;
+        showDebugMessage(`Cerchio magico infuso con elemento: ${result.name}`);
+        incrementaAffinita(result.name);
+        return result.name;
+      }
+    }
+    if (result.name === "cerchio") {
+      showEffect(result.name);
+      return result.name;
+    }
+    if (result.name === "proiettile") {
+      if (points.length >= 2) {
+        launchProjectile(points[0], points[points.length - 1]);
+      }
+    } else if (["fuoco", "acqua", "aria", "terra"].includes(result.name)) {
+      showEffect(result.name);
+      incrementaAffinita(result.name);
+      spendMana(1);
+    } else {
+      showEffect(result.name);
+    }
+    return result.name;
+  }
+  showDebugMessage('Simbolo non riconosciuto', 1000);
+  return null;
+}
+
+// === UTILITY E DEBUG ===
+function getElementColor(element) {
+  const colors = {
+    fuoco: '#ff5555',
+    acqua: '#5555ff',
+    aria: '#aaaaee',
+    terra: '#55aa55',
+    fulmine: '#ffff55',
+    luce: '#ffffff'
+  };
+  return colors[element] || '#ffffff';
+}
 
 function showDebugMessage(message, duration = 2000) {
-  // const debugBox = document.getElementById("debug");
-  // debugBox.classList.remove("hidden");
-  // debugBox.classList.add("visible");
-
-  // setTimeout(() => {
-  //   debugBox.classList.remove("visible");
-  //   debugBox.classList.add("hidden");
-  // }, duration);
+  // Debug UI disabilitata/commentata
 }
 
-// DEBUG
-
-function drawTemplate(name, ctx) {
-  const template = recognizer.templates.find(t => t.name === name);
-  if (!template) return;
-
+function drawPath() {
+  if (points.length < 2) return;
   ctx.beginPath();
-  ctx.moveTo(template.points[0].x, template.points[0].y);
-  for (let i = 1; i < template.points.length; i++) {
-    ctx.lineTo(template.points[i].x, template.points[i].y);
+  ctx.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i++) {
+    ctx.lineTo(points[i].x, points[i].y);
   }
-  ctx.strokeStyle = 'red';
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = "rgba(180, 240, 255, 0.6)";
+  ctx.lineWidth = 3;
   ctx.stroke();
 }
 
-// FINE DEBUG
-
-function resizeCanvas() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-}
-
-// === MANA SYSTEM ===
-
-function spendMana(amount) {
-  if (getManaValues().inBurnout) return false;
-  if (getCurrentMana() < amount) {
-    triggerBurnout();
-    return false;
-  }
-  setCurrentMana(getCurrentMana() - amount);
-
-  addPlayerExp(amount);
-  return true;
-}
-
-function triggerBurnout() {
-  let manaVals = getManaValues();
-  setManaValues({
-    burnout: true,
-    burnoutT: 300, // 5 secondi a 60fps
-    current: 0
-  });
-  showDebugMessage("Burnout! Mana esaurito.", 2000);
-}
-
-function regenMana() {
-  let { mana, manaMax, manaRecoverSpeed, inBurnout, burnoutTimer } = getManaValues();
-  if (!inBurnout && mana < manaMax) {
-    mana += manaRecoverSpeed;
-    if (mana > manaMax) mana = manaMax;
-  }
-  if (inBurnout) {
-    burnoutTimer--;
-    if (burnoutTimer <= 0) {
-      inBurnout = false;
-      mana = manaMax * 0.2; // riparti con il 20%
-    }
-  }
-  setManaValues({ max: manaMax, current: mana, regen: manaRecoverSpeed, burnout: inBurnout, burnoutT: burnoutTimer });
-  // Salva il mana attuale
-  savePlayerData({ mana });
-}
-
-// === SISTEMA DI LEVELING ===
-let playerLevel = 1;
-let playerExp = 0;
-let playerExpToNext = 100;
-
-// Carica dati player all'avvio
-const loadedPlayer = getPlayerData();
-if (loadedPlayer) {
-  playerLevel = loadedPlayer.livello || 1;
-  playerExp = loadedPlayer.esperienza || 0;
-  playerExpToNext = getExpToNext(playerLevel);
-  updateManaStatsForLevel(playerLevel);
-  if (typeof loadedPlayer.mana === 'number') {
-    setCurrentMana(loadedPlayer.mana);
-  }
-  drawExpBar(); // <-- Aggiorna subito la barra exp
-}
-
-// Aggiorna mana massimo e rigenerazione in base al livello
-function updateManaStatsForLevel(level) {
-  const baseMana = 1;
-  const baseRegen = 0.01; // Molto lento a livello 1
-  setManaValues({
-    max: baseMana * level * 10,
-    regen: baseRegen * level * 0.2 // Crescita più evidente con il livello
-  });
-}
-
-// Quando il player guadagna esperienza:
-function addPlayerExp(amount) {
-  playerExp += amount;
-  while (playerExp >= playerExpToNext) {
-    playerExp -= playerExpToNext;
-    playerLevel++;
-    playerExpToNext = getExpToNext(playerLevel);
-    updateManaStatsForLevel(playerLevel);
-    showDebugMessage(`Livello salito! Ora sei livello ${playerLevel}`);
-    // Salva livello ogni volta che cambia
-    savePlayerData({ livello: playerLevel });
-  }
-  // Salva esperienza ogni volta che cambia
-  savePlayerData({ esperienza: playerExp });
-  drawExpBar();
-}
-
-function drawExpBar() {
-  const bar = document.getElementById('exp-bar');
-  const lvl = document.getElementById('exp-level');
-  const glow = document.querySelector('.exp-bar-glow');
-  const barContainer = document.getElementById('exp-bar-container');
-  if (!bar || !lvl || !glow || !barContainer) return;
-  const prevPerc = parseFloat(bar.style.getPropertyValue('width'))/100 || 0;
-  lvl.textContent = playerLevel;
-  const perc = Math.min(1, playerExp / playerExpToNext);
-  bar.style.width = (perc * 100) + "%";
-
-  // Mostra barra exp e livello con transizione
-  barContainer.classList.add('exp-visible');
-  lvl.classList.add('exp-visible');
-  if (window._expBarHideTimeout) clearTimeout(window._expBarHideTimeout);
-  window._expBarHideTimeout = setTimeout(() => {
-    barContainer.classList.remove('exp-visible');
-    lvl.classList.remove('exp-visible');
-  }, 1000);
-
-  // Attiva animazione glow solo se la barra aumenta
-  if (perc > prevPerc) {
-    glow.classList.remove('animate');
-    void glow.offsetWidth;
-    void bar.offsetWidth;
-    setTimeout(() => {
-      glow.classList.add('animate');
-    }, 0);
-    setTimeout(() => glow.classList.remove('animate'), 1100);
-  }
-}
-
-function getExpToNext(level) {
-  // Esempio: base 100, cresce quadraticamente
-  return Math.floor(100 + 30 * Math.pow(level, 1.5));
-}
-
-// Nuova funzione per tracciare la linea durante il drag del cerchio magico
 function drawMagicCircleDragTrail() {
   if (isActivatingMagicCircle && magicCircleDragStart && magicCircleDragEnd) {
     ctx.save();
@@ -874,53 +573,152 @@ function drawMagicCircleDragTrail() {
   }
 }
 
-function triggerMagicCircleAction(start, end) {
+function drawTemplate(name, ctx) {
+  const template = recognizer.templates.find(t => t.name === name);
+  if (!template) return;
+  ctx.beginPath();
+  ctx.moveTo(template.points[0].x, template.points[0].y);
+  for (let i = 1; i < template.points.length; i++) {
+    ctx.lineTo(template.points[i].x, template.points[i].y);
+  }
+  ctx.strokeStyle = 'red';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+}
+
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+
+// === SISTEMA DI LEVELING E MANA ===
+let playerLevel = 1;
+let playerExp = 0;
+let playerExpToNext = 100;
+
+const loadedPlayer = getPlayerData();
+if (loadedPlayer) {
+  playerLevel = loadedPlayer.livello || 1;
+  playerExp = loadedPlayer.esperienza || 0;
+  playerExpToNext = getExpToNext(playerLevel);
+  updateManaStatsForLevel(playerLevel);
+  if (typeof loadedPlayer.mana === 'number') {
+    setCurrentMana(loadedPlayer.mana);
+  }
+  drawExpBar();
+}
+
+function updateManaStatsForLevel(level) {
+  const baseMana = 1;
+  const baseRegen = 0.01;
+  setManaValues({
+    max: baseMana * level * 10,
+    regen: baseRegen * level * 0.2
+  });
+}
+
+function addPlayerExp(amount) {
+  playerExp += amount;
+  while (playerExp >= playerExpToNext) {
+    playerExp -= playerExpToNext;
+    playerLevel++;
+    playerExpToNext = getExpToNext(playerLevel);
+    updateManaStatsForLevel(playerLevel);
+    showDebugMessage(`Livello salito! Ora sei livello ${playerLevel}`);
+    savePlayerData({ livello: playerLevel });
+  }
+  savePlayerData({ esperienza: playerExp });
+  drawExpBar();
+}
+
+function drawExpBar() {
+  const bar = document.getElementById('exp-bar');
+  const lvl = document.getElementById('exp-level');
+  const glow = document.querySelector('.exp-bar-glow');
+  const barContainer = document.getElementById('exp-bar-container');
+  if (!bar || !lvl || !glow || !barContainer) return;
+  const prevPerc = parseFloat(bar.style.getPropertyValue('width'))/100 || 0;
+  lvl.textContent = playerLevel;
+  const perc = Math.min(1, playerExp / playerExpToNext);
+  bar.style.width = (perc * 100) + "%";
+  barContainer.classList.add('exp-visible');
+  lvl.classList.add('exp-visible');
+  if (window._expBarHideTimeout) clearTimeout(window._expBarHideTimeout);
+  window._expBarHideTimeout = setTimeout(() => {
+    barContainer.classList.remove('exp-visible');
+    lvl.classList.remove('exp-visible');
+  }, 1000);
+  if (perc > prevPerc) {
+    glow.classList.remove('animate');
+    void glow.offsetWidth;
+    void bar.offsetWidth;
+    setTimeout(() => {
+      glow.classList.add('animate');
+    }, 0);
+    setTimeout(() => glow.classList.remove('animate'), 1100);
+  }
+}
+
+function getExpToNext(level) {
+  return Math.floor(100 + 30 * Math.pow(level, 1.5));
+}
+
+function spendMana(amount) {
+  if (getManaValues().inBurnout) return false;
+  if (getCurrentMana() < amount) {
+    triggerBurnout();
+    return false;
+  }
+  setCurrentMana(getCurrentMana() - amount);
+  addPlayerExp(amount);
+  return true;
+}
+
+function triggerBurnout() {
+  let manaVals = getManaValues();
+  setManaValues({
+    burnout: true,
+    burnoutT: 300,
+    current: 0
+  });
+  showDebugMessage("Burnout! Mana esaurito.", 2000);
+}
+
+function regenMana() {
+  let { mana, manaMax, manaRecoverSpeed, inBurnout, burnoutTimer } = getManaValues();
+  if (!inBurnout && mana < manaMax) {
+    mana += manaRecoverSpeed;
+    if (mana > manaMax) mana = manaMax;
+  }
+  if (inBurnout) {
+    burnoutTimer--;
+    if (burnoutTimer <= 0) {
+      inBurnout = false;
+      mana = manaMax * 0.2;
+    }
+  }
+  setManaValues({ max: manaMax, current: mana, regen: manaRecoverSpeed, burnout: inBurnout, burnoutT: burnoutTimer });
+  savePlayerData({ mana });
+}
+
+// === AFFINITA' E PROIEZIONI USATE ===
+function incrementaAffinita(elemento) {
   let player = getPlayerData();
-
-  if (!player.proiettiliLanciati) player.proiettiliLanciati = 0;
-
-  // Solo elemento
-  if (magicCircle.elemento && (!magicCircle.projectileCount || magicCircle.projectileCount === 0)) {
-    showEffect(magicCircle.elemento, magicCircle.x, magicCircle.y);
-    incrementaAffinita(magicCircle.elemento);
+  if (!player) return;
+  if (!player.affinita) player.affinita = {};
+  if (!player.affinita[elemento]) player.affinita[elemento] = 0;
+  player.affinita[elemento]++;
+  savePlayerData({ affinita: player.affinita });
+  let players = JSON.parse(localStorage.getItem('players') || '[]');
+  const idx = players.findIndex(p => p.username === player.username);
+  if (idx !== -1) {
+    players[idx].affinita = player.affinita;
+    localStorage.setItem('players', JSON.stringify(players));
   }
-  // Solo proiezione
-  else if ((!magicCircle.elemento || magicCircle.elemento === null) && magicCircle.projectileCount > 0 && start && end) {
-    // Lancia un singolo proiettile
-    magicCircle.projectileCount--; // Decrementa il conteggio dei proiettili
-    launchProjectile(start, end, "#78dcff");
-    incrementaProiezioneUsata("proiettile");
-    showDebugMessage(`Proiettile lanciato! Cariche rimanenti: ${magicCircle.projectileCount}`);
-
-    // Cancella il cerchio magico se non ci sono più cariche
-    if (magicCircle.projectileCount <= 0) {
-      magicCircleToDelete = true;
-    }
-  }
-  // Entrambi
-  else if (magicCircle.elemento && magicCircle.projectileCount > 0 && start && end) {
-    // Lancia un singolo proiettile con l'elemento infuso
-    let color = getElementColor(magicCircle.elemento);
-    if (!color.endsWith(',')) {
-      if (color.startsWith('#') && color.length === 7) {
-        const r = parseInt(color.slice(1, 3), 16);
-        const g = parseInt(color.slice(3, 5), 16);
-        const b = parseInt(color.slice(5, 7), 16);
-        color = `rgba(${r},${g},${b},`;
-      } else {
-        color = color + ',';
-      }
-    }
-    launchProjectile(start, end, color + "1)");
-    magicCircle.projectileCount--; // Decrementa il conteggio dei proiettili
-    incrementaProiezioneUsata(magicCircle.infusedProjection || "proiettile");
-    showDebugMessage(`Proiettile lanciato con elemento ${magicCircle.elemento}! Cariche rimanenti: ${magicCircle.projectileCount}`);
-
-    // Cancella il cerchio magico se non ci sono più cariche
-    if (magicCircle.projectileCount <= 0) {
-      magicCircleToDelete = true;
-    }
-  }
+  console.log('[Affinità attuali]');
+  Object.entries(player.affinita).forEach(([k, v]) => {
+    console.log(`${k}: ${v}`);
+  });
 }
 
 function incrementaProiezioneUsata(tipo) {
@@ -930,3 +728,31 @@ function incrementaProiezioneUsata(tipo) {
   player.proiezioniUsate[tipo]++;
   savePlayerData({ proiezioniUsate: player.proiezioniUsate });
 }
+
+// === ANIMATE LOOP ===
+function animate() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (casting) drawPath();
+  updateParticles();
+  drawParticles();
+  drawFireParticles();
+  drawMagicParticles();
+  drawMagicCircle();
+  updateProjectiles();
+  drawProjectiles();
+  regenMana();
+  requestAnimationFrame(animate);
+  circleRotation += 0.003;
+  drawManaSegments();
+  drawMagicCircleDragTrail();
+  // drawTemplate('terra', ctx);
+
+  if (magicCircleToDelete) {
+    magicCircle = null;
+    infusedElement = null;
+    infusedProjection = null;
+    magicCircleToDelete = false;
+  }
+}
+
+animate();
