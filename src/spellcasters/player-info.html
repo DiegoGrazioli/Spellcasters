@@ -161,7 +161,7 @@
         vittorie: player.vittorie || 0,
         partite: player.partite || 0,
         affinita: player.affinita || {},
-        predisposizione: player.predisposizione || {}
+        predisposizione: player.proiezioniUsate || {}
       };
     }
     // Chart.js CDN loader
@@ -188,10 +188,13 @@
       };
     }
     function getRadarDataPredisposizione(predisposizione) {
-      const tipi = ['proiettile']; // Estendibile
+      // Prendi tutte le chiavi presenti nell'oggetto predisposizione
+      const tipi = Object.keys(predisposizione && typeof predisposizione === 'object' ? predisposizione : {});
+      // Se non ci sono dati, mostra almeno "proiettile"
+      const labels = tipi.length > 0 ? tipi : ['proiettile'];
       return {
-        labels: tipi,
-        data: tipi.map(t => predisposizione && predisposizione[t] ? predisposizione[t] : 0)
+        labels,
+        data: labels.map(t => predisposizione && predisposizione[t] ? predisposizione[t] : 0)
       };
     }
     let radarChart1 = null;

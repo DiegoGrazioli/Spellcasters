@@ -34,6 +34,8 @@ let isActivatingMagicCircle = false;
 let magicCircleDragStart = null;
 let magicCircleDragEnd = null;
 
+let magicCircleToDelete = false;
+
 // === MANA SYSTEM ===
 // Usa solo il modulo manabar.js per gestire mana, manaMax, manaRecoverSpeed
 
@@ -294,9 +296,17 @@ function recognizeSpell(points) {
         // Funzione per creare l'effetto particellare
         function createParticleEffect(color) {
           // Logica per creare particelle con il colore specificato
-          particles.forEach(particle => {
-            particle.color = color;
-          });
+           for (let i = 0; i < 20; i++) {
+              particles.push({
+                x: mouseX,
+                y: mouseY,
+                radius: Math.random() * 2 + 1,
+                alpha: 1,
+                dx: (Math.random() - 0.5) * 1.5,
+                dy: (Math.random() - 0.5) * 1.5,
+                color: color
+              });
+            }
         }
         //   showDebugMessage(`Cerchio magico infuso con proiezione: ${result.name}`);
         //   return result.name;
@@ -456,7 +466,7 @@ function showEffect(type) {
 // === PROIEZIONE: PROIETTILE ===
 let projectiles = [];
 
-function launchProjectile(start, end, colorOverride) {
+function launchProjectile(start, end, colorOverride, tipoProiezione = "proiettile") {
   if (!spendMana(2)) return;
   const dx = end.x - start.x;
   const dy = end.y - start.y;
@@ -493,8 +503,10 @@ function launchProjectile(start, end, colorOverride) {
     vy,
     life: maxLife,
     alpha: 1,
-    color // <--- salva il colore scelto!
+    color, // <--- salva il colore scelto!
+    tipo: tipoProiezione // salva il tipo di proiezione
   });
+  incrementaProiezioneUsata("proiettile");
 }
 
 function updateProjectiles() {
@@ -546,6 +558,13 @@ function animate() {
   drawManaSegments();
   drawMagicCircleDragTrail();
   // drawTemplate('terra', ctx); // Disegna il template del fuoco per debug
+
+  if (magicCircleToDelete) {
+    magicCircle = null;
+    infusedElement = null;
+    infusedProjection = null;
+    magicCircleToDelete = false;
+  }
 }
 
 // PARTICELLE ELEMENTALI
@@ -856,6 +875,10 @@ function drawMagicCircleDragTrail() {
 }
 
 function triggerMagicCircleAction(start, end) {
+  let player = getPlayerData();
+
+  if (!player.proiettiliLanciati) player.proiettiliLanciati = 0;
+
   // Solo elemento
   if (magicCircle.elemento && (!magicCircle.projectileCount || magicCircle.projectileCount === 0)) {
     showEffect(magicCircle.elemento, magicCircle.x, magicCircle.y);
@@ -866,12 +889,17 @@ function triggerMagicCircleAction(start, end) {
     // Lancia un singolo proiettile
     magicCircle.projectileCount--; // Decrementa il conteggio dei proiettili
     launchProjectile(start, end, "#78dcff");
+    incrementaProiezioneUsata("proiettile");
     showDebugMessage(`Proiettile lanciato! Cariche rimanenti: ${magicCircle.projectileCount}`);
+
+    // Cancella il cerchio magico se non ci sono più cariche
+    if (magicCircle.projectileCount <= 0) {
+      magicCircleToDelete = true;
+    }
   }
   // Entrambi
   else if (magicCircle.elemento && magicCircle.projectileCount > 0 && start && end) {
     // Lancia un singolo proiettile con l'elemento infuso
-    magicCircle.projectileCount--; // Decrementa il conteggio dei proiettili
     let color = getElementColor(magicCircle.elemento);
     if (!color.endsWith(',')) {
       if (color.startsWith('#') && color.length === 7) {
@@ -884,13 +912,21 @@ function triggerMagicCircleAction(start, end) {
       }
     }
     launchProjectile(start, end, color + "1)");
+    magicCircle.projectileCount--; // Decrementa il conteggio dei proiettili
+    incrementaProiezioneUsata(magicCircle.infusedProjection || "proiettile");
     showDebugMessage(`Proiettile lanciato con elemento ${magicCircle.elemento}! Cariche rimanenti: ${magicCircle.projectileCount}`);
-  }
 
-  // Cancella il cerchio magico se non ci sono più cariche
-  if (magicCircle.projectileCount <= 0) {
-    magicCircle = null;
-    infusedElement = null;
-    infusedProjection = null;
+    // Cancella il cerchio magico se non ci sono più cariche
+    if (magicCircle.projectileCount <= 0) {
+      magicCircleToDelete = true;
+    }
   }
+}
+
+function incrementaProiezioneUsata(tipo) {
+  let player = getPlayerData();
+  if (!player.proiezioniUsate) player.proiezioniUsate = {};
+  if (!player.proiezioniUsate[tipo]) player.proiezioniUsate[tipo] = 0;
+  player.proiezioniUsate[tipo]++;
+  savePlayerData({ proiezioniUsate: player.proiezioniUsate });
 }
