@@ -738,6 +738,7 @@ function animate() {
   drawFireParticles();
   drawMagicParticles();
   drawMagicCircle();
+  drawLastProjectileParticles();
   updateProjectiles();
   drawProjectiles();
   regenMana();
@@ -752,6 +753,32 @@ function animate() {
     infusedElement = null;
     infusedProjection = null;
     magicCircleToDelete = false;
+  }
+}
+
+function drawLastProjectileParticles() {
+  if (!magicCircle || !magicCircle.projectileCount || magicCircle.projectileCount < 1) return;
+
+  // Calcola la posizione dell'ultimo proiettile nel poligono
+  const count = magicCircle.projectileCount;
+  const angle = -Math.PI / 2 + (2 * Math.PI / count) * (count - 1) - circleRotation;
+  const r = magicCircle.radius * 1.1;
+  const x = magicCircle.x + Math.cos(angle) * r;
+  const y = magicCircle.y + Math.sin(angle) * r;
+
+  // Effetto particellare sull'ultimo cerchio
+  for (let i = 0; i < 6; i++) {
+    activeMagicParticles.push({
+      x: x + (Math.random() - 0.5) * 12,
+      y: y + (Math.random() - 0.5) * 12,
+      radius: Math.random() * 2 + 1,
+      alpha: 0.18 + Math.random() * 0.18,
+      dx: (Math.random() - 0.5) * 0.5,
+      dy: (Math.random() - 0.5) * 0.5,
+      color: magicCircle.elemento
+        ? getElementColor(magicCircle.elemento) + ","
+        : "rgba(255, 0, 255,"
+    });
   }
 }
 
