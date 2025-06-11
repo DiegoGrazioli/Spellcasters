@@ -263,18 +263,6 @@ export function drawElementPattern(ctx, x, y, r, element) {
 export function drawProjectilePattern(ctx, x, y, r, color) {
   ctx.save();
   ctx.translate(x, y);
-  // Anello principale (più grande e meno spesso)
-  // ctx.beginPath();
-  // ctx.arc(0, 0, r * 0.82 * 0.3, 0, 2 * Math.PI);
-  // ctx.lineWidth = 4.2;
-  // ctx.strokeStyle = '#ff33cc';
-  // ctx.shadowColor = '#ff33cc';
-  // ctx.shadowBlur = 12;
-  // ctx.globalAlpha = 0.85;
-  // ctx.stroke();
-  // ctx.shadowBlur = 0;
-  // ctx.globalAlpha = 1;
-  // Anello interno sottile
   ctx.beginPath();
   ctx.arc(0, 0, r * 0.68 * 0.3, 0, 2 * Math.PI);
   ctx.lineWidth = 1.7;
@@ -452,14 +440,12 @@ export function drawAllElementPatterns() {
   });
 }
 
-export function drawProjectilePolygonPattern(ctx, x, y, r, count, color = "#ff33cc", rotation = 0) {
+export function drawProjectilePolygonPattern(ctx, x, y, r, count, color = "#ff33cc", rotation = 0, tipi = []) {
   if (count < 1) return;
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(rotation);
 
-  // Calcola posizione dei vertici
-  const R = r * 0.82 * 0.3;
   const polyR = r * 0.92;
   const verts = [];
   for (let i = 0; i < count; i++) {
@@ -470,9 +456,15 @@ export function drawProjectilePolygonPattern(ctx, x, y, r, count, color = "#ff33
     });
   }
 
-  // Disegna i cerchi proiettile
-  for (let v of verts) {
-    drawProjectilePattern(ctx, v.x, v.y, r, color);
+  // Disegna il pattern corretto per ogni vertice
+  for (let i = 0; i < verts.length; i++) {
+    const v = verts[i];
+    const tipo = Array.isArray(tipi) ? tipi[i] : tipi;
+    if (tipo === "spaziale") {
+      drawSpazialePattern(ctx, v.x, v.y, r, color, 0);
+    } else {
+      drawProjectilePattern(ctx, v.x, v.y, r, color);
+    }
   }
 
   // Collega i cerchi con linee
@@ -491,6 +483,66 @@ export function drawProjectilePolygonPattern(ctx, x, y, r, count, color = "#ff33
     ctx.shadowBlur = 8;
     ctx.stroke();
     ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+  }
+
+  ctx.restore();
+}
+
+// Pattern per la proiezione permanente "spaziale"
+export function drawSpazialePattern(ctx, x, y, r, color = "#00e0ff", rotation = 0) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rotation);
+
+  // Cerchi concentrici
+  for (let i = 1; i <= 4; i++) {
+    ctx.beginPath();
+    ctx.arc(0, 0, r * (0.25 + i * 0.16) * 0.3, 0, 2 * Math.PI);
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = 0.5 + 0.1 * i;
+    ctx.lineWidth = i === 4 ? 3 : 1.5;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  // Segmenti radiali (come raggi di energia)
+  for (let i = 0; i < 8; i++) {
+    let angle = (Math.PI * 2 / 8) * i + rotation;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(angle) * r * 0.25 * 0.3, Math.sin(angle) * r * 0.25  * 0.3);
+    ctx.lineTo(Math.cos(angle) * r * 0.89 * 0.3, Math.sin(angle) * r * 0.89 * 0.3);
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = 0.7;
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  // Archi intrecciati (simbolo di distorsione spaziale)
+  for (let i = 0; i < 3; i++) {
+    ctx.save();
+    ctx.rotate(i * Math.PI / 3 + rotation / 2);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, r * 0.65 * 0.3, r * 0.18  * 0.3, 0, 0, 2 * Math.PI);
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = 0.6;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  // Piccoli punti magici
+  for (let i = 0; i < 12; i++) {
+    let angle = (Math.PI * 2 / 12) * i;
+    let px = Math.cos(angle) * r * 0.92 * 0.3;
+    let py = Math.sin(angle) * r * 0.92 * 0.3;
+    ctx.beginPath();
+    ctx.arc(px, py, 2, 0, 2 * Math.PI);
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.6;
+    ctx.fill();
     ctx.globalAlpha = 1;
   }
 

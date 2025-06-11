@@ -172,20 +172,28 @@ export default class DollarRecognizer {
         {x: 100, y: 120}  // Verticale giù
     ]);
     this.addGesture('proiettile', [
-        {x: 100, y: 100}, // Inizio
-        {x: 120, y: 120}  // Obliqua basso-destra
+        {x: 100, y: 100},
+        {x: 120, y: 120}  
     ]);
     this.addGesture('proiettile', [
-        {x: 100, y: 100}, // Inizio
-        {x: 80, y: 120}   // Obliqua basso-sinistra
+        {x: 100, y: 100},
+        {x: 80, y: 120}   
     ]);
     this.addGesture('proiettile', [
-        {x: 100, y: 100}, // Inizio
-        {x: 120, y: 80}   // Obliqua alto-destra
+        {x: 100, y: 100},
+        {x: 120, y: 80}   
     ]);
     this.addGesture('proiettile', [
-        {x: 100, y: 100}, // Inizio
-        {x: 80, y: 80}    // Obliqua alto-sinistra
+        {x: 100, y: 100},
+        {x: 80, y: 80}   
+    ]);
+
+    this.addGesture('spaziale', [
+        {x: 100, y: 100}, // Inizio al centro
+        {x: 100, y: 80},  // Verticale su
+        {x: 115, y: 100},  // Obliqua alto-destra
+        {x: 115, y: 80}, // Verticale giù
+        {x: 100, y: 100}, // Obliqua basso-destra
     ]);
   }
 
