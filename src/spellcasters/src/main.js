@@ -36,6 +36,12 @@ let mouseY = 0;
 
 let particleCount = Number(localStorage.getItem('particleCount')) || 60;
 
+let isDrawingSpaziale = false;
+let spazialePolygonPoints = [];
+let spazialePolygonColor = "#00e0ff";
+
+let permanentSpazialeAreas = [];
+
 // === EVENTI CANVAS ===
 canvas.addEventListener("mousedown", (e) => {
   if (e.button !== 0 || !magicCircle) return;
@@ -43,10 +49,17 @@ canvas.addEventListener("mousedown", (e) => {
   const dy = e.offsetY - magicCircle.y;
   const dist = Math.hypot(dx, dy);
   if (dist > magicCircle.radius + 20) return;
-  if (magicCircle.projectileCount > 0) {
-    isActivatingMagicCircle = true;
-    magicCircleDragStart = { x: magicCircle.x, y: magicCircle.y };
-    magicCircleDragEnd = { x: e.offsetX, y: e.offsetY };
+  if (magicCircle.projections.length > 0) {
+    const tipo = magicCircle.projections[magicCircle.projections.length - 1];
+    if (tipo === "spaziale") {
+      isDrawingSpaziale = true;
+      spazialePolygonPoints = [];
+      spazialePolygonColor = magicCircle.elemento ? getElementColor(magicCircle.elemento) : "#00e0ff";
+    } else {
+      isActivatingMagicCircle = true;
+      magicCircleDragStart = { x: magicCircle.x, y: magicCircle.y };
+      magicCircleDragEnd = { x: e.offsetX, y: e.offsetY };
+    }
   }
 });
 
@@ -54,6 +67,10 @@ canvas.addEventListener("mousemove", (e) => {
   const rect = canvas.getBoundingClientRect();
   mouseX = e.clientX - rect.left;
   mouseY = e.clientY - rect.top;
+  if (isDrawingSpaziale) {
+    spazialePolygonPoints.push({ x: mouseX, y: mouseY });
+    return;
+  }
   if (isActivatingMagicCircle && magicCircle) {
     magicCircleDragEnd = { x: e.offsetX, y: e.offsetY };
   }
@@ -76,6 +93,19 @@ canvas.addEventListener("mousemove", (e) => {
 
 canvas.addEventListener("mouseup", (e) => {
   let player = getPlayerData();
+  if (isDrawingSpaziale && spazialePolygonPoints.length > 2 && magicCircle && !player.isOverloaded) {
+    // Chiudi il poligono
+    spazialePolygonPoints.push({ ...spazialePolygonPoints[0] });
+    // Usa la proiezione spaziale
+    magicCircle.projections.pop(); // Consuma la carica
+    activateSpazialeArea(spazialePolygonPoints, spazialePolygonColor);
+    incrementaProiezioneUsata("spaziale");
+    showDebugMessage(`Area SPAZIALE creata! Cariche rimanenti: ${magicCircle.projections.length}`);
+    if (magicCircle.projections.length <= 0) magicCircleToDelete = true;
+    isDrawingSpaziale = false;
+    spazialePolygonPoints = [];
+    return;
+  }
   if (isActivatingMagicCircle && magicCircle && !player.isOverloaded) {
     triggerMagicCircleAction(magicCircleDragStart, magicCircleDragEnd);
     isActivatingMagicCircle = false;
@@ -88,10 +118,21 @@ canvas.addEventListener("mouseup", (e) => {
 
 canvas.addEventListener("contextmenu", (e) => {
   e.preventDefault();
-  if (!magicCircle) return;
   const rect = canvas.getBoundingClientRect();
   const mx = e.clientX - rect.left;
   const my = e.clientY - rect.top;
+
+  // Cancella area spaziale se il click è dentro una di esse
+  for (let i = permanentSpazialeAreas.length - 1; i >= 0; i--) {
+    if (pointInPolygon({x: mx, y: my}, permanentSpazialeAreas[i].points)) {
+      permanentSpazialeAreas.splice(i, 1);
+      showDebugMessage("Area spaziale rimossa!");
+      return;
+    }
+  }
+
+  // Cancella cerchio magico se fuori dalle aree
+  if (!magicCircle) return;
   const dx = mx - magicCircle.x;
   const dy = my - magicCircle.y;
   const dist = Math.hypot(dx, dy);
@@ -218,15 +259,16 @@ function drawMagicCircle() {
 
   // Pattern di proiezione
   let projColor = infusedElement ? getElementColor(infusedElement) : "#ff33cc";
-  if (magicCircle.projectileCount && magicCircle.projectileCount > 0) {
+  if (magicCircle.projections && magicCircle.projections.length > 0) {
     drawProjectilePolygonPattern(
       ctx,
       x,
       y,
       radius * 1.2,
-      magicCircle.projectileCount,
+      magicCircle.projections.length,
       projColor,
-      -2 * circleRotation
+      -2 * circleRotation,
+      magicCircle.projections // <-- passa l'array dei tipi
     );
   }
 
@@ -284,11 +326,11 @@ function showEffect(type) {
       x: mousePos.x,
       y: mousePos.y,
       radius: 120,
-      thickness: 3
+      thickness: 3,
+      projections: [] // <-- sostituisce projectileCount
     };
     infusedElement = null;
     infusedProjection = null;
-    projectileCount: 0;
     return;
   }
 
@@ -448,22 +490,27 @@ function triggerMagicCircleAction(start, end) {
   if (!player.proiettiliLanciati) player.proiettiliLanciati = 0;
 
   // Solo elemento
-  if (magicCircle.elemento && (!magicCircle.projectileCount || magicCircle.projectileCount === 0)) {
+  if (magicCircle.elemento && (!magicCircle.projections || magicCircle.projections.length === 0)) {
     showEffect(magicCircle.elemento, magicCircle.x, magicCircle.y);
     incrementaAffinita(magicCircle.elemento);
   }
   // Solo proiezione
-  else if ((!magicCircle.elemento || magicCircle.elemento === null) && magicCircle.projectileCount > 0 && start && end) {
-    magicCircle.projectileCount--;
-    launchProjectile(start, end, "#78dcff");
-    incrementaProiezioneUsata("proiettile");
-    showDebugMessage(`Proiettile lanciato! Cariche rimanenti: ${magicCircle.projectileCount}`);
-    if (magicCircle.projectileCount <= 0) {
+  else if ((!magicCircle.elemento || magicCircle.elemento === null) && magicCircle.projections && magicCircle.projections.length > 0 && start && end) {
+    const tipo = magicCircle.projections.pop(); // FILO
+    if (tipo === "spaziale") {
+      activateSpazialeProjection(start, end);
+    } else {
+      launchProjectile(start, end, "#78dcff", tipo);
+    }
+    incrementaProiezioneUsata(tipo);
+    showDebugMessage(`Proiezione lanciata! Cariche rimanenti: ${magicCircle.projections.length}`);
+    if (magicCircle.projections.length <= 0) {
       magicCircleToDelete = true;
     }
   }
   // Entrambi
-  else if (magicCircle.elemento && magicCircle.projectileCount > 0 && start && end) {
+  else if (magicCircle.elemento && magicCircle.projections && magicCircle.projections.length > 0 && start && end) {
+    const tipo = magicCircle.projections.pop(); // FILO
     let color = getElementColor(magicCircle.elemento);
     if (!color.endsWith(',')) {
       if (color.startsWith('#') && color.length === 7) {
@@ -475,13 +522,35 @@ function triggerMagicCircleAction(start, end) {
         color = color + ',';
       }
     }
-    launchProjectile(start, end, color + "1)");
-    magicCircle.projectileCount--;
-    incrementaProiezioneUsata(magicCircle.infusedProjection || "proiettile");
-    showDebugMessage(`Proiettile lanciato con elemento ${magicCircle.elemento}! Cariche rimanenti: ${magicCircle.projectileCount}`);
-    if (magicCircle.projectileCount <= 0) {
+    if (tipo === "spaziale") {
+      activateSpazialeProjection(start, end, color + "1)");
+    } else {
+      launchProjectile(start, end, color + "1)", tipo);
+    }
+    incrementaProiezioneUsata(tipo);
+    showDebugMessage(`Proiezione lanciata con elemento ${magicCircle.elemento}! Cariche rimanenti: ${magicCircle.projections.length}`);
+    if (magicCircle.projections.length <= 0) {
       magicCircleToDelete = true;
     }
+  }
+}
+
+// Funzione placeholder per la proiezione spaziale
+function activateSpazialeProjection(start, end, color = "#00e0ff") {
+  // Esegui qui l'effetto speciale della proiezione spaziale
+  // Ad esempio: effetto grafico, teletrasporto, distorsione, ecc.
+  showDebugMessage("Proiezione SPAZIALE attivata!");
+  // Esempio di effetto: una breve esplosione di particelle azzurre
+  for (let i = 0; i < 60; i++) {
+    activeMagicParticles.push({
+      x: start.x + (Math.random() - 0.5) * 40,
+      y: start.y + (Math.random() - 0.5) * 40,
+      radius: Math.random() * 3 + 1,
+      alpha: 0.7,
+      dx: (Math.random() - 0.5) * 6,
+      dy: (Math.random() - 0.5) * 6,
+      color: color.replace("1)", "0.7)")
+    });
   }
 }
 
@@ -493,11 +562,13 @@ function recognizeSpell(points) {
   if (result.score > 0.60) {
     showDebugMessage(`Simbolo riconosciuto: ${result.name} (${Math.round(result.score * 100)}% confidenza)`);
     if (magicCircle) {
-      if (["proiettile", "triangolo"].includes(result.name)) {
-        if (!magicCircle.projectileCount) magicCircle.projectileCount = 0;
-        magicCircle.projectileCount++;
+      // Aggiungi qui anche "spaziale"
+      if (["proiettile", "triangolo", "spaziale"].includes(result.name)) {
+        if (!magicCircle.projections) magicCircle.projections = [];
+        // Usa direttamente il nome riconosciuto come tipo di proiezione
+        magicCircle.projections.push(result.name === "triangolo" ? "proiettile" : result.name);
         infusedProjection = result.name;
-        showDebugMessage(`Proiettili accumulati: ${magicCircle.projectileCount}`);
+        showDebugMessage(`Proiezioni accumulate: ${magicCircle.projections.length}`);
         return result.name;
       }
       if (["fuoco", "acqua", "aria", "terra"].includes(result.name)) {
@@ -516,6 +587,8 @@ function recognizeSpell(points) {
       if (points.length >= 2) {
         launchProjectile(points[0], points[points.length - 1]);
       }
+    } else if (result.name === "spaziale") {
+      // Puoi aggiungere qui eventuali effetti speciali per "spaziale" fuori dal cerchio magico
     } else if (["fuoco", "acqua", "aria", "terra"].includes(result.name)) {
       showEffect(result.name);
       incrementaAffinita(result.name);
@@ -702,12 +775,12 @@ function regenMana() {
 }
 
 // === AFFINITA' E PROIEZIONI USATE ===
-function incrementaAffinita(elemento) {
+function incrementaAffinita(elemento, valore = 1) {
   let player = getPlayerData();
   if (!player) return;
   if (!player.affinita) player.affinita = {};
   if (!player.affinita[elemento]) player.affinita[elemento] = 0;
-  player.affinita[elemento]++;
+  player.affinita[elemento] += valore;
   savePlayerData({ affinita: player.affinita });
   let players = JSON.parse(localStorage.getItem('players') || '[]');
   const idx = players.findIndex(p => p.username === player.username);
@@ -721,11 +794,11 @@ function incrementaAffinita(elemento) {
   });
 }
 
-function incrementaProiezioneUsata(tipo) {
+function incrementaProiezioneUsata(tipo, valore = 1) {
   let player = getPlayerData();
   if (!player.proiezioniUsate) player.proiezioniUsate = {};
   if (!player.proiezioniUsate[tipo]) player.proiezioniUsate[tipo] = 0;
-  player.proiezioniUsate[tipo]++;
+  player.proiezioniUsate[tipo] += valore;
   savePlayerData({ proiezioniUsate: player.proiezioniUsate });
 }
 
@@ -741,6 +814,38 @@ function animate() {
   drawLastProjectileParticles();
   updateProjectiles();
   drawProjectiles();
+  drawSpazialePolygon();
+  drawPermanentSpazialeAreas();
+
+  let manaToDrain = 0;
+  const deltaTime = 1 / 60; // animate gira a ~60fps
+  for (let i = permanentSpazialeAreas.length - 1; i >= 0; i--) {
+    const area = permanentSpazialeAreas[i];
+    manaToDrain += area.manaDrain;
+
+    // Timer affinità
+    area.affinityTimer += deltaTime;
+    if (area.affinityTimer >= 1) {
+      area.affinityTimer -= 1;
+      // Calcolo proporzionale all'area
+      const areaValue = polygonArea(area.points);
+      const affinityGain = 0.5 * (areaValue / 100000);
+      incrementaProiezioneUsata("spaziale", affinityGain);
+      const element = getElementFromColor(area.color);
+      if (element) incrementaAffinita(element, affinityGain);
+    }
+  }
+  if (manaToDrain > 0) {
+    let currentMana = getCurrentMana();
+    if (currentMana <= manaToDrain) {
+      permanentSpazialeAreas = [];
+      showDebugMessage("Mana esaurito! Tutte le aree spaziali sono svanite.");
+      triggerBurnout();
+    } else {
+      setCurrentMana(currentMana - manaToDrain);
+    }
+  }
+
   regenMana();
   requestAnimationFrame(animate);
   circleRotation += 0.003;
@@ -757,16 +862,14 @@ function animate() {
 }
 
 function drawLastProjectileParticles() {
-  if (!magicCircle || !magicCircle.projectileCount || magicCircle.projectileCount < 1) return;
+  if (!magicCircle || !magicCircle.projections || magicCircle.projections.length < 1) return;
 
-  // Calcola la posizione dell'ultimo proiettile nel poligono
-  const count = magicCircle.projectileCount;
+  const count = magicCircle.projections.length;
   const angle = -Math.PI / 2 + (2 * Math.PI / count) * (count - 1) - circleRotation;
   const r = magicCircle.radius * 1.1;
   const x = magicCircle.x + Math.cos(angle) * r;
   const y = magicCircle.y + Math.sin(angle) * r;
 
-  // Effetto particellare sull'ultimo cerchio
   for (let i = 0; i < 6; i++) {
     activeMagicParticles.push({
       x: x + (Math.random() - 0.5) * 12,
@@ -780,6 +883,124 @@ function drawLastProjectileParticles() {
         : "rgba(255, 0, 255,"
     });
   }
+}
+
+function drawSpazialePolygon() {
+  if (isDrawingSpaziale && spazialePolygonPoints.length > 1) {
+    ctx.save();
+    ctx.globalAlpha = 0.25;
+    ctx.beginPath();
+    ctx.moveTo(spazialePolygonPoints[0].x, spazialePolygonPoints[0].y);
+    for (let i = 1; i < spazialePolygonPoints.length; i++) {
+      ctx.lineTo(spazialePolygonPoints[i].x, spazialePolygonPoints[i].y);
+    }
+    ctx.closePath();
+    ctx.fillStyle = spazialePolygonColor;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = spazialePolygonColor;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function activateSpazialeArea(points, color) {
+  const area = polygonArea(points);
+  const manaDrain = Math.max(0.01, area / 10000 * 0.01);
+
+  // Salva l'area per la persistenza
+  permanentSpazialeAreas.push({ points: points.map(p => ({...p})), color, manaDrain, affinityTimer: 0 });
+
+  // Effetto visivo area spaziale (opzionale, per feedback immediato)
+  ctx.save();
+  ctx.globalAlpha = 0.3;
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i++) {
+    ctx.lineTo(points[i].x, points[i].y);
+  }
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.restore();
+
+  // Particelle magiche lungo il bordo
+  for (let i = 0; i < points.length - 1; i++) {
+    const p1 = points[i], p2 = points[i + 1];
+    for (let t = 0; t < 1; t += 0.1) {
+      const x = p1.x + (p2.x - p1.x) * t;
+      const y = p1.y + (p2.y - p1.y) * t;
+      activeMagicParticles.push({
+        x, y,
+        radius: Math.random() * 2 + 1,
+        alpha: 0.5 + Math.random() * 0.3,
+        dx: (Math.random() - 0.5) * 0.5,
+        dy: (Math.random() - 0.5) * 0.5,
+        color: color.replace("1)", "0.7)").replace(")", ",")
+      });
+    }
+  }
+}
+
+function drawPermanentSpazialeAreas() {
+  for (const area of permanentSpazialeAreas) {
+    ctx.save();
+    ctx.globalAlpha = 0.25;
+    ctx.beginPath();
+    ctx.moveTo(area.points[0].x, area.points[0].y);
+    for (let i = 1; i < area.points.length; i++) {
+      ctx.lineTo(area.points[i].x, area.points[i].y);
+    }
+    ctx.closePath();
+    ctx.fillStyle = area.color;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = area.color;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function pointInPolygon(point, vs) {
+  let x = point.x, y = point.y;
+  let inside = false;
+  for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+    let xi = vs[i].x, yi = vs[i].y;
+    let xj = vs[j].x, yj = vs[j].y;
+    let intersect = ((yi > y) !== (yj > y)) &&
+      (x < (xj - xi) * (y - yi) / (yj - yi + 0.00001) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+function polygonArea(points) {
+  let area = 0;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    area += (points[j].x + points[i].x) * (points[j].y - points[i].y);
+  }
+  return Math.abs(area / 2);
+}
+
+function getElementFromColor(color) {
+  const colorMap = {
+    '#ff5555': 'fuoco',
+    '#5555ff': 'acqua',
+    '#aaaaee': 'aria',
+    '#55aa55': 'terra',
+    '#ffff55': 'fulmine',
+    '#ffffff': 'luce'
+  };
+  // Cerca una corrispondenza esatta
+  if (colorMap[color]) return colorMap[color];
+  // Oppure cerca una corrispondenza parziale (per rgba)
+  for (const [hex, el] of Object.entries(colorMap)) {
+    if (color.includes(hex.slice(1))) return el;
+  }
+  return null;
 }
 
 animate();
