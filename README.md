@@ -2,6 +2,7 @@
 A simple web app game with *magic*
 
 **ITA**
+
 N.B. Per Player e Caster si intende la stessa cosa
 
 # Sistema di magia:
@@ -24,14 +25,14 @@ In base a cosa si ha invocato, si hanno dei risultati diversi:
 
 ## Elementi:
 
-- **Fuoco** (si genera disegnando una “y” a partire dal basso \[da cambiare se si hanno idee migliori\]
+- **Fuoco** (si genera disegnando una “y” al contrario)
 - **Acqua** (si genera disegnando una goccia)
-- **Aria** (si genera disegnando “un giro di molla”)
+- **Aria** (si genera disegnando “un giro di molla” o "pigtail")
 - **Terra** (si genera disegnando un quadrato \[a partire dal lato sinistro dal basso verso l’alto in poi\] con il punto di fine che oltrepassa la linea iniziale \[lato sinistro e inferiore devono essere intersecati\])
 - **Fulmine** (si genera disegnando il simbolo del fulmine dall’alto verso il basso)
 - **Luce** (si genera disegnando un “+” \[a partire da sinistra verso destra, si uniscono estremo destro con superiore e poi si traccia verso il basso\])
 - **Oscurità** (si genera disegnando in maniera stilizzata delle corna)
-- **Benessere** (simbolo dell’infinito \[a partire da sinistra andando in alto\])
+- **Benessere** (simbolo dell’infinito \[a partire da sinistra\])
 - … (da aggiungere una volta che funzionerà la base)
 
 Cerchio magico:
@@ -48,8 +49,7 @@ Proiezioni:
 
 ## ANNULLAMENTO MAGIE PERMANENTI:
 
-- Tasto destro del mouse: si annulla la prima magia che si ha iniziato a permanere (come se fosse un “first in first out”)
-- Tasto destro del mouse premuto: dal puntatore del player appaiono i cerchi magici attivi (sottoforma di “bolle” disposte ad arco avente come centro la posizione del puntatore del mouse di quando si è abilitata la funzione) e con tasto sinistro si seleziona quella da annullare, mentre con tasto destro si annulla la selezione.
+- Tasto destro del mouse sulla magia (se si usa un laser semplice tasto destro)
 
  ### Resistenze (-> = superefficace, l’opposto è resistenza/counter, TUTTO QUESTO SERVE SOLO PER LE DIFESE o per ANNULLARE/CONTRASTARE ALTRE MAGIE IN CAMPO):
 
@@ -83,13 +83,13 @@ Più si utilizza la magia, più aumenta l’esperienza. L’esperienza permette 
 - capienza massima di mana (in futuro dovrà esserci un matchmaking bilanciato in base al livello che si ha)
 - velocità di rigenerazione di mana
 
-Se si ignora il mana rimanente e lo si oltrepassa, si va in **burnout** (le magie attive si annullano e non si possono utilizzare magie per 5 secondi)
+Se si ignora il mana rimanente e lo si oltrepassa, si va in **burnout** (o overload) (le magie attive si annullano e non si possono utilizzare magie per 5 secondi)
 
 ### Consumo di mana:
 - Elementi: 1 mana
 - Proiezioni (non permanenti): 2 mana
-- Proiezioni (permanenti): 2 mana (consumo ogni 0.1 secondi)
-- Proiezioni spaziali: lunghezza (in percentuale) * altezza (in percentuale) mana
+- Proiezioni (permanenti): mana graduale (consumo ogni 0.1 secondi)
+- Proiezioni spaziali: mana in base all'area
 - Cerchi magici: 0 mana
 - Cerchi magici caricati di elementi e proiezioni (non permanenti): proiezione * 1.5 mana
 - Cerchi magici caricati di elementi e proiezioni: proiezione (consumo ogni 0.1 secondi) mana
@@ -98,7 +98,7 @@ Se si ignora il mana rimanente e lo si oltrepassa, si va in **burnout** (le magi
 
 ##### Modalità di implementazione graduale:
 
-- Prima versione (di test per vedere se funziona):
+- Alpha (di test per vedere se funziona):
   - Elementi: Acqua, Fuoco, Aria, Terra
   - Proiezioni: Proiettile
   - No magie permanenti (e sistema di annullamento)
@@ -106,13 +106,22 @@ Se si ignora il mana rimanente e lo si oltrepassa, si va in **burnout** (le magi
   - No interazione delle magie
   - UI di visualizzazione mana
   - Livello ed esperienza
-- Seconda versione:
+- 1.0:
+  - Implementazione magie permanenti (e sistema di annullamento)
+  - Proiezioni: spaziale
+- 1.1:
   - Arena
   - Sistema di interazione delle magie in campo
-- Terza versione:
+- 1.1.2:
+  - Sistema di salvataggio delle magie
+- 1.2:
   - Nuovi elementi: Fulmine, Luce, Oscurità
   - Nuove proiezioni: Trappola, laser
-  - Implementazione magie permanenti (e sistema di annullamento)
-- Quarta versione:
+- 1.3:
   - Nuovo elemento: Benessere
   - Nuova proiezione: Stato (e sistema di resistenze)
+  
+...
+
+- 2.0:
+  - Open World
