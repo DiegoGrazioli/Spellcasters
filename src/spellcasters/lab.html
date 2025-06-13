@@ -22,6 +22,16 @@
   </div>
   <script type="module">
     import './src/main.js';
+    import { getPlayerData } from './src/player-db.js';
+    
+    window.addEventListener("DOMContentLoaded", async () => {
+      const player = await getPlayerData();
+      if (player && player.livello) {
+        const lvlElem = document.getElementById("exp-level"); // o "player-level"
+        if (lvlElem) lvlElem.textContent = player.livello;
+      }
+    });
+
     document.getElementById('home-btn').onclick = () => {
       window.location.href = 'home.html';
     };

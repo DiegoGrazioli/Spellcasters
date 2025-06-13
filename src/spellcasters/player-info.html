@@ -129,6 +129,8 @@
   </div>
   <script type="module">
     import { getTheme, initTheme } from './src/theme.js';
+    import { getPlayerData } from './src/player-db.js';
+
     initTheme();
     function updateBodyThemeClass() {
       const theme = getTheme();
@@ -137,33 +139,7 @@
     }
     updateBodyThemeClass();
     window.onThemeChange = updateBodyThemeClass;
-    // Recupera dati player
-    function getPlayer(username) {
-      let players = JSON.parse(localStorage.getItem('players') || '[]');
-      return players.find(p => p.username === username);
-    }
-    function getPlayerData() {
-      const username = localStorage.getItem('currentPlayer');
-      if (!username) return null;
-      const player = getPlayer(username);
-      if (!player) return null;
-      // Recupera anche mana attuale se presente (da playerData)
-      let mana = 100;
-      try {
-        const playerData = JSON.parse(localStorage.getItem('playerData_' + username));
-        if (playerData && typeof playerData.mana === 'number') mana = playerData.mana;
-      } catch {}
-      return {
-        username: player.username,
-        livello: player.livello || player.level || 1,
-        esperienza: player.esperienza || player.exp || 0,
-        mana,
-        vittorie: player.vittorie || 0,
-        partite: player.partite || 0,
-        affinita: player.affinita || {},
-        predisposizione: player.proiezioniUsate || {}
-      };
-    }
+    
     // Chart.js CDN loader
     function loadChartJs(callback) {
       if (window.Chart) return callback();
@@ -191,7 +167,7 @@
       // Prendi tutte le chiavi presenti nell'oggetto predisposizione
       const tipi = Object.keys(predisposizione && typeof predisposizione === 'object' ? predisposizione : {});
       // Se non ci sono dati, mostra almeno "proiettile"
-      const labels = tipi.length > 0 ? tipi : ['proiettile'];
+      const labels = tipi.length > 0 ? tipi : ['proiettile', 'spaziale'];
       return {
         labels,
         data: labels.map(t => predisposizione && predisposizione[t] ? predisposizione[t] : 0)
@@ -199,6 +175,7 @@
     }
     let radarChart1 = null;
     let radarChart2 = null;
+
     function renderRadarCharts(affinita, predisposizione) {
       loadChartJs(() => {
         const ctx1 = document.getElementById('affinity-radar').getContext('2d');
@@ -260,25 +237,35 @@
         });
       });
     }
+
     function getExpToNext(level) {
       return Math.floor(100 + 30 * Math.pow(level, 1.5));
     }
-    function renderPlayerInfo() {
-      const data = getPlayerData();
+
+    async function renderPlayerInfo() {
+      const username = getUsernameFromQuery();
+      if (!username) {
+        document.getElementById('player-info-card').innerHTML = '<h2>Errore</h2><p>Username non specificato.</p>';
+        return;
+      }
+      const data = await getPlayerData(username);
       if (!data) {
         document.getElementById('player-info-card').innerHTML = '<h2>Errore</h2><p>Utente non trovato. Effettua di nuovo il login.</p>';
         return;
       }
       document.getElementById('info-username').textContent = data.username;
-      document.getElementById('info-level').textContent = data.livello;
-      // Esperienza: mostra attuale/necessaria
-      const expToNext = getExpToNext(data.livello);
-      document.getElementById('info-exp').textContent = `${data.esperienza}/${expToNext}`;
-      document.getElementById('info-mana').textContent = data.mana;
-      document.getElementById('info-vittorie').textContent = data.vittorie;
-      document.getElementById('info-partite').textContent = data.partite;
-      renderRadarCharts(data.affinita, data.predisposizione);
+      document.getElementById('info-level').textContent = data.livello || data.level || 1;
+      const expToNext = getExpToNext(data.livello || data.level || 1);
+      // Arrotonda esperienza e mana a due cifre decimali
+      const exp = typeof data.esperienza === 'number' ? Number(data.esperienza.toFixed(2)) : (typeof data.exp === 'number' ? Number(data.exp.toFixed(2)) : 0);
+      document.getElementById('info-exp').textContent = `${exp}/${Number(expToNext.toFixed(2))}`;
+      const mana = typeof data.mana === 'number' ? Number(data.mana.toFixed(2)) : 0;
+      document.getElementById('info-mana').textContent = `${mana}/${data.livello * 10}`;
+      document.getElementById('info-vittorie').textContent = data.vittorie || 0;
+      document.getElementById('info-partite').textContent = data.partite || 0;
+      renderRadarCharts(data.affinita || {}, data.proiezioniUsate || {});
     }
+
     renderPlayerInfo();
     document.getElementById('back-home-btn').onclick = () => {
       window.location.href = 'home.html';
@@ -290,6 +277,11 @@
           renderPlayerInfo();
         }
       });
+    }
+
+    function getUsernameFromQuery() {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('user');
     }
   </script>
 </body>

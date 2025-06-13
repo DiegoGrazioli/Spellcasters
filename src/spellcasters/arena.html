@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Spellcasters - Arena</title>
+  <link rel="stylesheet" href="src/style-base.css">
+  <link rel="stylesheet" href="src/style-buttons.css">
+  <link rel="stylesheet" href="src/style-arena.css">
+</head>
+<body>
+  <div id="arena-container" class="centered">
+    <h1 id="arena-title">Arena Multiplayer</h1>
+    <div id="matchmaking-status">
+      <p id="status-message">In attesa di avversari...</p>
+      <button id="cancel-matchmaking" class="main-btn">Annulla Ricerca</button>
+    </div>
+    <div id="player-info">
+      <h2>Informazioni Giocatore</h2>
+      <p id="player-name">Nome: <span id="name-value">Giocatore</span></p>
+      <p id="player-level">Livello: <span id="level-value">1</span></p>
+    </div>
+    <div id="arena-actions">
+      <button id="start-game" class="main-btn">Inizia Partita</button>
+    </div>
+  </div>
+  <script type="module" src="src/arena.js"></script>
+</body>
+</html>

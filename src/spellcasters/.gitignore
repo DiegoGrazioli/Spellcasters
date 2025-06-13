@@ -7,12 +7,18 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Runtime data
 node_modules
 dist
 dist-ssr
 *.local
 
-# Editor directories and files
+# Firebase emulators/cache/local
+.firebase/
+.firebaserc
+firebase-debug.log
+
+# Editor files
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -22,3 +28,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Optional: ignore .env if using Firebase config
+.env
+.env.*

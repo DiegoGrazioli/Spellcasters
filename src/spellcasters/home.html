@@ -49,6 +49,7 @@
   <script type="module">
     import { createThemeToggle, initTheme, getTheme } from './src/theme.js';
     initTheme();
+    const username = localStorage.getItem('currentPlayer');
     const themeToggle = createThemeToggle();
     document.getElementById('btn-lab').onclick = () => {
       window.location.href = 'lab.html';
@@ -66,7 +67,11 @@
     };
     // Pulsante info player (ora un vero link)
     document.getElementById('btn-player-info').onclick = () => {
-      window.location.href = 'player-info.html';
+      if (username) {
+        window.location.href = `player-info.html?user=${encodeURIComponent(username)}`;
+      } else {
+        alert("Nessun utente loggato!");
+      }
     };
     // Aggiorna la classe del body per il tema
     function updateBodyThemeClass() {

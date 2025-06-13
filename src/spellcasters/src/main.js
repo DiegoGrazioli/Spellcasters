@@ -1,10 +1,12 @@
 import DollarRecognizer from "./dollarRecognizer";
 import { drawManaSegments, setManaValues, getManaValues, setCurrentMana, getCurrentMana, getManaMax, getManaRecoverSpeed } from "./Manabar";
-import { setTheme, getTheme } from "./theme.js";
-import { drawElementPattern, drawMagicTrianglePattern, drawProjectilePolygonPattern } from "./element-patterns.js";
-import { getPlayerData, savePlayerData } from "./playerData.js";
+import { setTheme } from "./theme.js";
+import { drawElementPattern, drawProjectilePolygonPattern } from "./element-patterns.js";
+import { loadPlayerFromDB, savePlayerData, getPlayerData } from "./player-db.js";
 
 const recognizer = new DollarRecognizer();
+
+const username = localStorage.getItem('currentPlayer');
 
 const canvas = document.getElementById("spellCanvas");
 canvas.addEventListener("contextmenu", (e) => e.preventDefault());
@@ -41,6 +43,14 @@ let spazialePolygonPoints = [];
 let spazialePolygonColor = "#00e0ff";
 
 let permanentSpazialeAreas = [];
+
+let affinityToAdd = {};
+let proiezioniToAdd = {};
+let lastAffinitySave = Date.now();
+let lastProiezioniSave = Date.now();
+
+let expToAdd = 0;
+let lastExpSave = Date.now();
 
 // === EVENTI CANVAS ===
 canvas.addEventListener("mousedown", (e) => {
@@ -99,7 +109,7 @@ canvas.addEventListener("mouseup", (e) => {
     // Usa la proiezione spaziale
     magicCircle.projections.pop(); // Consuma la carica
     activateSpazialeArea(spazialePolygonPoints, spazialePolygonColor);
-    incrementaProiezioneUsata("spaziale");
+    incrementaProiezioneUsataBuffer("spaziale");
     showDebugMessage(`Area SPAZIALE creata! Cariche rimanenti: ${magicCircle.projections.length}`);
     if (magicCircle.projections.length <= 0) magicCircleToDelete = true;
     isDrawingSpaziale = false;
@@ -453,7 +463,7 @@ function launchProjectile(start, end, colorOverride, tipoProiezione = "proiettil
     color,
     tipo: tipoProiezione
   });
-  incrementaProiezioneUsata("proiettile");
+  incrementaProiezioneUsataBuffer("proiettile");
 }
 
 function updateProjectiles() {
@@ -492,7 +502,7 @@ function triggerMagicCircleAction(start, end) {
   // Solo elemento
   if (magicCircle.elemento && (!magicCircle.projections || magicCircle.projections.length === 0)) {
     showEffect(magicCircle.elemento, magicCircle.x, magicCircle.y);
-    incrementaAffinita(magicCircle.elemento);
+    incrementaAffinitaBuffer(magicCircle.elemento);
   }
   // Solo proiezione
   else if ((!magicCircle.elemento || magicCircle.elemento === null) && magicCircle.projections && magicCircle.projections.length > 0 && start && end) {
@@ -502,7 +512,7 @@ function triggerMagicCircleAction(start, end) {
     } else {
       launchProjectile(start, end, "#78dcff", tipo);
     }
-    incrementaProiezioneUsata(tipo);
+    incrementaProiezioneUsataBuffer(tipo);
     showDebugMessage(`Proiezione lanciata! Cariche rimanenti: ${magicCircle.projections.length}`);
     if (magicCircle.projections.length <= 0) {
       magicCircleToDelete = true;
@@ -527,7 +537,7 @@ function triggerMagicCircleAction(start, end) {
     } else {
       launchProjectile(start, end, color + "1)", tipo);
     }
-    incrementaProiezioneUsata(tipo);
+    incrementaProiezioneUsataBuffer(tipo);
     showDebugMessage(`Proiezione lanciata con elemento ${magicCircle.elemento}! Cariche rimanenti: ${magicCircle.projections.length}`);
     if (magicCircle.projections.length <= 0) {
       magicCircleToDelete = true;
@@ -552,6 +562,7 @@ function activateSpazialeProjection(start, end, color = "#00e0ff") {
       color: color.replace("1)", "0.7)")
     });
   }
+  incrementaProiezioneUsataBuffer("spaziale");
 }
 
 // === RICONOSCIMENTO GESTURE ===
@@ -575,7 +586,7 @@ function recognizeSpell(points) {
         magicCircle.elemento = result.name;
         infusedElement = result.name;
         showDebugMessage(`Cerchio magico infuso con elemento: ${result.name}`);
-        incrementaAffinita(result.name);
+        incrementaAffinitaBuffer(result.name);
         return result.name;
       }
     }
@@ -591,7 +602,7 @@ function recognizeSpell(points) {
       // Puoi aggiungere qui eventuali effetti speciali per "spaziale" fuori dal cerchio magico
     } else if (["fuoco", "acqua", "aria", "terra"].includes(result.name)) {
       showEffect(result.name);
-      incrementaAffinita(result.name);
+      incrementaAffinitaBuffer(result.name);
       spendMana(1);
     } else {
       showEffect(result.name);
@@ -669,17 +680,23 @@ let playerLevel = 1;
 let playerExp = 0;
 let playerExpToNext = 100;
 
-const loadedPlayer = getPlayerData();
-if (loadedPlayer) {
-  playerLevel = loadedPlayer.livello || 1;
-  playerExp = loadedPlayer.esperienza || 0;
-  playerExpToNext = getExpToNext(playerLevel);
-  updateManaStatsForLevel(playerLevel);
-  if (typeof loadedPlayer.mana === 'number') {
-    setCurrentMana(loadedPlayer.mana);
+(async () => {
+  const loadedPlayer = await loadPlayerFromDB(username);
+  if (loadedPlayer) {
+    playerLevel = loadedPlayer.livello || 1;
+    playerExp = loadedPlayer.esperienza || 0;
+    playerExpToNext = getExpToNext(playerLevel);
+    updateManaStatsForLevel(playerLevel);
+    if (typeof loadedPlayer.mana === 'number') {
+      setCurrentMana(loadedPlayer.mana);
+    }
+    if (typeof loadedPlayer.manaMax !== 'number') {
+      loadedPlayer.manaMax = getManaMax();
+      await savePlayerData(username, { manaMax: loadedPlayer.manaMax });
+    }
+    drawExpBar();
   }
-  drawExpBar();
-}
+})();
 
 function updateManaStatsForLevel(level) {
   const baseMana = 1;
@@ -690,17 +707,31 @@ function updateManaStatsForLevel(level) {
   });
 }
 
-function addPlayerExp(amount) {
-  playerExp += amount;
-  while (playerExp >= playerExpToNext) {
-    playerExp -= playerExpToNext;
-    playerLevel++;
-    playerExpToNext = getExpToNext(playerLevel);
-    updateManaStatsForLevel(playerLevel);
-    showDebugMessage(`Livello salito! Ora sei livello ${playerLevel}`);
-    savePlayerData({ livello: playerLevel });
+async function addPlayerExp(amount) {
+  let player = await loadPlayerFromDB(username);
+  if (!player) player = { username, esperienza: 0, livello: 1, affinita: {}, proiezioniUsate: {}, mana: 0 };
+  player.esperienza = (player.esperienza ?? 0) + amount;
+  let levelUp = false;
+  while (player.esperienza >= getExpToNext(player.livello ?? 1)) {
+    player.esperienza -= getExpToNext(player.livello ?? 1);
+    player.livello = (player.livello ?? 1) + 1;
+    updateManaStatsForLevel(player.livello);
+    player.manaMax = getManaMax();
+    showDebugMessage(`Livello salito! Ora sei livello ${player.livello}`);
+    levelUp = true;
   }
-  savePlayerData({ esperienza: playerExp });
+  player.manaMax = getManaMax();
+  await savePlayerData(username, {
+    esperienza: player.esperienza,
+    livello: player.livello,
+    affinita: player.affinita,
+    proiezioniUsate: player.proiezioniUsate,
+    mana: player.mana ?? 0,
+    manaMax: player.manaMax
+  });
+  playerLevel = player.livello;
+  playerExp = player.esperienza;
+  playerExpToNext = getExpToNext(playerLevel);
   drawExpBar();
 }
 
@@ -743,7 +774,7 @@ function spendMana(amount) {
     return false;
   }
   setCurrentMana(getCurrentMana() - amount);
-  addPlayerExp(amount);
+  expToAdd += manaToDrain;
   return true;
 }
 
@@ -757,7 +788,7 @@ function triggerBurnout() {
   showDebugMessage("Burnout! Mana esaurito.", 2000);
 }
 
-function regenMana() {
+async function regenMana() {
   let { mana, manaMax, manaRecoverSpeed, inBurnout, burnoutTimer } = getManaValues();
   if (!inBurnout && mana < manaMax) {
     mana += manaRecoverSpeed;
@@ -771,35 +802,47 @@ function regenMana() {
     }
   }
   setManaValues({ max: manaMax, current: mana, regen: manaRecoverSpeed, burnout: inBurnout, burnoutT: burnoutTimer });
-  savePlayerData({ mana });
+  await savePlayerData(username, { mana });
 }
 
 // === AFFINITA' E PROIEZIONI USATE ===
-function incrementaAffinita(elemento, valore = 1) {
-  let player = getPlayerData();
-  if (!player) return;
-  if (!player.affinita) player.affinita = {};
-  if (!player.affinita[elemento]) player.affinita[elemento] = 0;
-  player.affinita[elemento] += valore;
-  savePlayerData({ affinita: player.affinita });
-  let players = JSON.parse(localStorage.getItem('players') || '[]');
-  const idx = players.findIndex(p => p.username === player.username);
-  if (idx !== -1) {
-    players[idx].affinita = player.affinita;
-    localStorage.setItem('players', JSON.stringify(players));
-  }
-  console.log('[Affinità attuali]');
-  Object.entries(player.affinita).forEach(([k, v]) => {
-    console.log(`${k}: ${v}`);
-  });
+// async function incrementaAffinita(elemento, valore = 1) {
+//   let player = await loadPlayerFromDB(username);
+//   if (!player) player = { username, affinita: {}, proiezioniUsate: {}, mana: 0, livello: 1, esperienza: 0 };
+//   if (!player.affinita) player.affinita = {};
+//   if (!player.affinita[elemento]) player.affinita[elemento] = 0;
+//   player.affinita[elemento] += valore;
+//   // Imposta valori di default se undefined
+//   await savePlayerData(username, { 
+//     affinita: player.affinita,
+//     proiezioniUsate: player.proiezioniUsate || {},
+//     mana: player.mana ?? 0,
+//     livello: player.livello ?? 1,
+//     esperienza: player.esperienza ?? 0
+//   });
+// }
+
+// async function incrementaProiezioneUsata(tipo, valore = 1) {
+//   let player = await loadPlayerFromDB(username);
+//   if (!player) player = { username, affinita: {}, proiezioniUsate: {}, mana: 0, livello: 1, esperienza: 0 };
+//   if (!player.proiezioniUsate) player.proiezioniUsate = {};
+//   if (!player.proiezioniUsate[tipo]) player.proiezioniUsate[tipo] = 0;
+//   player.proiezioniUsate[tipo] += valore;
+//   await savePlayerData(username, { 
+//     affinita: player.affinita || {},
+//     proiezioniUsate: player.proiezioniUsate,
+//     mana: player.mana ?? 0,
+//     livello: player.livello ?? 1,
+//     esperienza: player.esperienza ?? 0
+//   });
+// }
+
+function incrementaAffinitaBuffer(elemento, valore = 1) {
+  affinityToAdd[elemento] = (affinityToAdd[elemento] || 0) + valore;
 }
 
-function incrementaProiezioneUsata(tipo, valore = 1) {
-  let player = getPlayerData();
-  if (!player.proiezioniUsate) player.proiezioniUsate = {};
-  if (!player.proiezioniUsate[tipo]) player.proiezioniUsate[tipo] = 0;
-  player.proiezioniUsate[tipo] += valore;
-  savePlayerData({ proiezioniUsate: player.proiezioniUsate });
+function incrementaProiezioneUsataBuffer(tipo, valore = 1) {
+  proiezioniToAdd[tipo] = (proiezioniToAdd[tipo] || 0) + valore;
 }
 
 // === ANIMATE LOOP ===
@@ -829,10 +872,11 @@ function animate() {
       area.affinityTimer -= 1;
       // Calcolo proporzionale all'area
       const areaValue = polygonArea(area.points);
-      const affinityGain = 0.5 * (areaValue / 100000);
-      incrementaProiezioneUsata("spaziale", affinityGain);
+      const affinityGain = 0.5 * (areaValue / 100000) * 0.0001;
+      incrementaProiezioneUsataBuffer("spaziale", affinityGain);
+
       const element = getElementFromColor(area.color);
-      if (element) incrementaAffinita(element, affinityGain);
+      if (element) incrementaAffinitaBuffer(element, area.manaDrain); // <-- aggiorna qui, non ogni frame!
     }
   }
   if (manaToDrain > 0) {
@@ -844,6 +888,43 @@ function animate() {
     } else {
       setCurrentMana(currentMana - manaToDrain);
     }
+    expToAdd += manaToDrain;
+  }
+
+  const now = Date.now();
+  if (now - lastAffinitySave > 1000 && Object.keys(affinityToAdd).length > 0) {
+    // Carica player, aggiorna affinità, salva
+    (async () => {
+      let player = await loadPlayerFromDB(username);
+      if (!player) player = { username, affinita: {}, proiezioniUsate: {}, mana: 0, livello: 1, esperienza: 0 };
+      for (const el in affinityToAdd) {
+        player.affinita[el] = (player.affinita[el] || 0) + affinityToAdd[el];
+      }
+      await savePlayerData(username, { affinita: player.affinita });
+      affinityToAdd = {};
+      lastAffinitySave = now;
+    })();
+    drawExpBar();
+  }
+  if (now - lastProiezioniSave > 1000 && Object.keys(proiezioniToAdd).length > 0) {
+    (async () => {
+      let player = await loadPlayerFromDB(username);
+      if (!player) player = { username, affinita: {}, proiezioniUsate: {}, mana: 0, livello: 1, esperienza: 0 };
+      for (const tipo in proiezioniToAdd) {
+        player.proiezioniUsate[tipo] = (player.proiezioniUsate[tipo] || 0) + proiezioniToAdd[tipo];
+      }
+      await savePlayerData(username, { proiezioniUsate: player.proiezioniUsate });
+      proiezioniToAdd = {};
+      lastProiezioniSave = now;
+    })();
+    drawExpBar();
+  }
+  if (now - lastExpSave > 1000 && expToAdd > 0) {
+    (async () => {
+      await addPlayerExp(expToAdd);
+      expToAdd = 0;
+      lastExpSave = now;
+    })();
   }
 
   regenMana();
@@ -942,6 +1023,7 @@ function activateSpazialeArea(points, color) {
       });
     }
   }
+
 }
 
 function drawPermanentSpazialeAreas() {
