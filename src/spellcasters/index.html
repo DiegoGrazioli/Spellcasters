@@ -85,6 +85,7 @@
   </div>
   <script type="module">
     import { createThemeToggle, initTheme, getTheme } from './src/theme.js';
+    import { savePlayerData } from './src/player-db.js';
     initTheme();
     // Aggiorna la classe del body per il tema
     function updateBodyThemeClass() {
@@ -179,6 +180,19 @@
         document.getElementById('signup-form').style.display = 'none';
         document.getElementById('login-form').style.display = '';
       }, 1200);
+      // Salva anche su Firebase
+      savePlayerData(user, {
+        esperienza: 0,
+        livello: 1,
+        affinita: {},
+        proiezioniUsate: {},
+        mana: 0,
+        manaMax: 10,
+        vittorie: 0,
+        partite: 0,
+        magie: [],
+        predisposizione: {}
+      });
     };
     // Switch tra login/signup
     document.getElementById('switch-link').onclick = () => {

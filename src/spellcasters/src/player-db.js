@@ -43,7 +43,22 @@ export async function getPlayerData(username) {
 export async function savePlayerData(username, data) {
   if (!username) return;
   let player = await loadPlayerFromDB(username);
-  if (!player) player = { username };
+  if (!player) {
+    // Qui puoi inizializzare tutti i campi di default!
+    player = {
+      username,
+      esperienza: 0,
+      livello: 1,
+      affinita: {},
+      proiezioniUsate: {},
+      mana: 0,
+      manaMax: 10, // o la funzione che calcola il mana massimo
+      vittorie: 0,
+      partite: 0,
+      magie: [],
+      predisposizione: {}
+    };
+  }
   // Aggiorna solo le proprietà passate, ma mantieni tutte le altre
   Object.assign(player, data);
   await setDoc(doc(db, "players", username), player);

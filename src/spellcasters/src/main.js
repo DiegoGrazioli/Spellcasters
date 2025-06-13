@@ -691,7 +691,7 @@ let playerExpToNext = 100;
       setCurrentMana(loadedPlayer.mana);
     }
     if (typeof loadedPlayer.manaMax !== 'number') {
-      loadedPlayer.manaMax = getManaMax();
+      loadedPlayer.manaMax = loadedPlayer.livello * 10 || 10;
       await savePlayerData(username, { manaMax: loadedPlayer.manaMax });
     }
     drawExpBar();
@@ -716,16 +716,16 @@ async function addPlayerExp(amount) {
     player.esperienza -= getExpToNext(player.livello ?? 1);
     player.livello = (player.livello ?? 1) + 1;
     updateManaStatsForLevel(player.livello);
-    player.manaMax = getManaMax();
+    player.manaMax = player.livello * 10;
     showDebugMessage(`Livello salito! Ora sei livello ${player.livello}`);
     levelUp = true;
   }
-  player.manaMax = getManaMax();
+  player.manaMax = player.manaMax || getManaMax();
   await savePlayerData(username, {
     esperienza: player.esperienza,
-    livello: player.livello,
+    livello: player.livello ?? 1,
     affinita: player.affinita,
-    proiezioniUsate: player.proiezioniUsate,
+    proiezioniUsate: player.proiezioniUsate ?? {},
     mana: player.mana ?? 0,
     manaMax: player.manaMax
   });
@@ -774,7 +774,7 @@ function spendMana(amount) {
     return false;
   }
   setCurrentMana(getCurrentMana() - amount);
-  expToAdd += manaToDrain;
+  expToAdd += amount;
   return true;
 }
 
@@ -802,41 +802,9 @@ async function regenMana() {
     }
   }
   setManaValues({ max: manaMax, current: mana, regen: manaRecoverSpeed, burnout: inBurnout, burnoutT: burnoutTimer });
-  await savePlayerData(username, { mana });
 }
 
 // === AFFINITA' E PROIEZIONI USATE ===
-// async function incrementaAffinita(elemento, valore = 1) {
-//   let player = await loadPlayerFromDB(username);
-//   if (!player) player = { username, affinita: {}, proiezioniUsate: {}, mana: 0, livello: 1, esperienza: 0 };
-//   if (!player.affinita) player.affinita = {};
-//   if (!player.affinita[elemento]) player.affinita[elemento] = 0;
-//   player.affinita[elemento] += valore;
-//   // Imposta valori di default se undefined
-//   await savePlayerData(username, { 
-//     affinita: player.affinita,
-//     proiezioniUsate: player.proiezioniUsate || {},
-//     mana: player.mana ?? 0,
-//     livello: player.livello ?? 1,
-//     esperienza: player.esperienza ?? 0
-//   });
-// }
-
-// async function incrementaProiezioneUsata(tipo, valore = 1) {
-//   let player = await loadPlayerFromDB(username);
-//   if (!player) player = { username, affinita: {}, proiezioniUsate: {}, mana: 0, livello: 1, esperienza: 0 };
-//   if (!player.proiezioniUsate) player.proiezioniUsate = {};
-//   if (!player.proiezioniUsate[tipo]) player.proiezioniUsate[tipo] = 0;
-//   player.proiezioniUsate[tipo] += valore;
-//   await savePlayerData(username, { 
-//     affinita: player.affinita || {},
-//     proiezioniUsate: player.proiezioniUsate,
-//     mana: player.mana ?? 0,
-//     livello: player.livello ?? 1,
-//     esperienza: player.esperienza ?? 0
-//   });
-// }
-
 function incrementaAffinitaBuffer(elemento, valore = 1) {
   affinityToAdd[elemento] = (affinityToAdd[elemento] || 0) + valore;
 }
@@ -900,7 +868,7 @@ function animate() {
       for (const el in affinityToAdd) {
         player.affinita[el] = (player.affinita[el] || 0) + affinityToAdd[el];
       }
-      await savePlayerData(username, { affinita: player.affinita });
+      await savePlayerData(username, { affinita: player.affinita ?? {} });
       affinityToAdd = {};
       lastAffinitySave = now;
     })();
@@ -911,11 +879,12 @@ function animate() {
       let player = await loadPlayerFromDB(username);
       if (!player) player = { username, affinita: {}, proiezioniUsate: {}, mana: 0, livello: 1, esperienza: 0 };
       for (const tipo in proiezioniToAdd) {
+        if (!player.proiezioniUsate) player.proiezioniUsate = {};
         player.proiezioniUsate[tipo] = (player.proiezioniUsate[tipo] || 0) + proiezioniToAdd[tipo];
       }
-      await savePlayerData(username, { proiezioniUsate: player.proiezioniUsate });
+      await savePlayerData(username, { proiezioniUsate: player.proiezioniUsate ?? {} });
       proiezioniToAdd = {};
-      lastProiezioniSave = now;
+      lastProiezioniSave = now;z
     })();
     drawExpBar();
   }
