@@ -42,6 +42,30 @@ function updateUI() {
     });
 }
 
+// Sostituisci con il tuo dominio Render
+const ws = new WebSocket('wss://tuo-servizio.onrender.com');
+
+ws.onopen = () => {
+    console.log('✅ Connessione WebSocket riuscita!');
+};
+
+ws.onmessage = (event) => {
+    console.log('📨 Messaggio dal server:', event.data);
+};
+
+ws.onerror = (error) => {
+    console.error('❌ Errore WebSocket:', error);
+};
+
+ws.onclose = () => {
+    console.log('🔌 Connessione WebSocket chiusa');
+};
+
+function updateOnlinePlayers(count) {
+    const el = document.getElementById('online-players-count');
+    if (el) el.textContent = count;
+}
+
 window.addEventListener('DOMContentLoaded', async () => {
     const username = localStorage.getItem('currentPlayer');
     if (username) {

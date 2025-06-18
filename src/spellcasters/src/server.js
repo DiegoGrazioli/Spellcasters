@@ -24,12 +24,22 @@ wss.on('connection', (ws) => {
         console.log('Player disconnected.');
         broadcastPlayers();
     });
+
+    broadcastOnlinePlayers();
 });
 
 function broadcastPlayers() {
     const playerList = players.map(player => ({ id: player.id, name: player.name }));
     players.forEach(player => {
         player.ws.send(JSON.stringify({ type: 'update', players: playerList }));
+    });
+}
+
+function broadcastOnlinePlayers() {
+    const count = wss.clients.size;
+    const msg = JSON.stringify({ type: 'onlinePlayers', count });
+    wss.clients.forEach(client => {
+        if (client.readyState === 1) client.send(msg);
     });
 }
 
