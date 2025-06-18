@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <title>Spellcasters - Home</title>
-  <link rel="stylesheet" href="src/style-base.css">
-  <link rel="stylesheet" href="src/style-buttons.css">
-  <link rel="stylesheet" href="src/style-home.css">
-  <link rel="stylesheet" href="src/style-modal.css">
-  <link rel="stylesheet" href="src/style-expbar.css">
+  <link rel="stylesheet" href="./style-base.css">
+  <link rel="stylesheet" href="./style-buttons.css">
+  <link rel="stylesheet" href="./style-home.css">
+  <link rel="stylesheet" href="./style-modal.css">
+  <link rel="stylesheet" href="./style-expbar.css">
 </head>
 <body>
   <div id="home-container" class="centered">
@@ -46,8 +46,8 @@
   </div>
   <!-- Sostituito il div foschia con un canvas per la foschia animata -->
   <canvas id="home-fog-canvas"></canvas>
-  <script type="module">
-    import { createThemeToggle, initTheme, getTheme } from './src/theme.js';
+  <script>
+    import { createThemeToggle, initTheme, getTheme } from './theme.js';
     initTheme();
     const username = localStorage.getItem('currentPlayer');
     const themeToggle = createThemeToggle();
@@ -85,6 +85,6 @@
     updateBodyThemeClass();
     window.onThemeChange = updateBodyThemeClass;
   </script>
-  <script type="module" src="src/home.js"></script>
+  <script type="module" src="./home.js"></script>
 </body>
 </html>

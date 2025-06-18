@@ -2,11 +2,11 @@
 <html lang="it">
 <head>
   <meta charset="UTF-8" />
-  <link rel="stylesheet" href="src/style-base.css" />
-  <link rel="stylesheet" href="src/style-buttons.css" />
-  <link rel="stylesheet" href="src/style-home.css" />
-  <link rel="stylesheet" href="src/style-modal.css" />
-  <link rel="stylesheet" href="src/style-expbar.css" />
+  <link rel="stylesheet" href="./style-base.css" />
+  <link rel="stylesheet" href="./style-buttons.css" />
+  <link rel="stylesheet" href="./style-home.css" />
+  <link rel="stylesheet" href="./style-modal.css" />
+  <link rel="stylesheet" href="./style-expbar.css" />
   <title>Spellcaster - Login</title>
   <style>
     #login-container {
@@ -83,9 +83,9 @@
       <span id="switch-link2">Hai già un account? Login</span>
     </form>
   </div>
-  <script type="module">
-    import { createThemeToggle, initTheme, getTheme } from './src/theme.js';
-    import { savePlayerData } from './src/player-db.js';
+  <script>
+    import { createThemeToggle, initTheme, getTheme } from './theme.js';
+    import { savePlayerData } from './player-db.js';
     initTheme();
     // Aggiorna la classe del body per il tema
     function updateBodyThemeClass() {

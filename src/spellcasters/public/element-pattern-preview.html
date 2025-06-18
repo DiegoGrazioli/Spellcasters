@@ -10,11 +10,11 @@
     .pattern-box { display: flex; flex-direction: column; align-items: center; font-family: 'Cinzel'; }
     .pattern-label { margin-top: 18px; font-size: 1.3rem; letter-spacing: 0.08em; text-shadow: 0 2px 8px #000a; }
   </style>
-  <link rel="stylesheet" href="src/style-base.css">
-  <link rel="stylesheet" href="src/style-buttons.css">
-  <link rel="stylesheet" href="src/style-home.css">
-  <link rel="stylesheet" href="src/style-modal.css">
-  <link rel="stylesheet" href="src/style-expbar.css">
+  <link rel="stylesheet" href="./style-base.css">
+  <link rel="stylesheet" href="./style-buttons.css">
+  <link rel="stylesheet" href="./style-home.css">
+  <link rel="stylesheet" href="./style-modal.css">
+  <link rel="stylesheet" href="./style-expbar.css">
 </head>
 <body>
   <h1 id="home-title" style="text-align:center;margin-top:32px;letter-spacing:0.1em;">Preview Pattern Elementali</h1>
@@ -48,8 +48,8 @@
       <div class="pattern-label">Spaziale</div>
     </div>
   </div>
-  <script type="module">
-    import { drawAllElementPatterns, drawProjectilePattern, drawMagicTrianglePattern, drawSpazialePattern } from './src/element-patterns.js';
+  <script>
+    import { drawAllElementPatterns, drawProjectilePattern, drawMagicTrianglePattern, drawSpazialePattern } from './element-patterns.js';
     window.addEventListener('DOMContentLoaded', () => {
       drawAllElementPatterns();
       // Disegna pattern proiettile

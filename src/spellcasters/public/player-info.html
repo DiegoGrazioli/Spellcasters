@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <title>Info Giocatore - Spellcasters</title>
-  <link rel="stylesheet" href="src/style-base.css">
-  <link rel="stylesheet" href="src/style-buttons.css">
-  <link rel="stylesheet" href="src/style-home.css">
-  <link rel="stylesheet" href="src/style-modal.css">
-  <link rel="stylesheet" href="src/style-expbar.css">
+  <link rel="stylesheet" href="./style-base.css">
+  <link rel="stylesheet" href="./style-buttons.css">
+  <link rel="stylesheet" href="./style-home.css">
+  <link rel="stylesheet" href="./style-modal.css">
+  <link rel="stylesheet" href="./style-expbar.css">
   <style>
     #player-info-container {
       min-height: 100vh;
@@ -127,9 +127,9 @@
       <button id="back-home-btn" class="main-btn home-btn-long">Torna alla Home</button>
     </div>
   </div>
-  <script type="module">
-    import { getTheme, initTheme } from './src/theme.js';
-    import { getPlayerData } from './src/player-db.js';
+  <script>
+    import { getTheme, initTheme } from './theme.js';
+    import { getPlayerData } from './player-db.js';
 
     initTheme();
     function updateBodyThemeClass() {

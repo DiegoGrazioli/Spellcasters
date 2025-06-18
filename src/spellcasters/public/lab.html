@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <title>Spellcasters - Lab</title>
-  <link rel="stylesheet" href="src/style-base.css">
-  <link rel="stylesheet" href="src/style-buttons.css">
-  <link rel="stylesheet" href="src/style-home.css">
-  <link rel="stylesheet" href="src/style-modal.css">
-  <link rel="stylesheet" href="src/style-expbar.css">
+  <link rel="stylesheet" href="./style-base.css">
+  <link rel="stylesheet" href="./style-buttons.css">
+  <link rel="stylesheet" href="./style-home.css">
+  <link rel="stylesheet" href="./style-modal.css">
+  <link rel="stylesheet" href="./style-expbar.css">
 </head>
 <body>
   <button id="home-btn" class="btn-permanent">Home</button>
@@ -20,9 +20,9 @@
       <div class="exp-bar-glow"></div>
     </div>
   </div>
-  <script type="module">
-    import './src/main.js';
-    import { getPlayerData } from './src/player-db.js';
+  <script>
+    import '/main.js';
+    import { getPlayerData } from './player-db.js';
     
     window.addEventListener("DOMContentLoaded", async () => {
       const player = await getPlayerData();
@@ -35,7 +35,7 @@
     document.getElementById('home-btn').onclick = () => {
       window.location.href = 'home.html';
     };
-    import { createThemeToggle, initTheme, getTheme } from './src/theme.js';
+    import { createThemeToggle, initTheme, getTheme } from '/theme.js';
     initTheme();
     // Aggiorna la classe del body per il tema
     function updateBodyThemeClass() {
