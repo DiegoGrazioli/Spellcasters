@@ -43,7 +43,7 @@ function updateUI() {
 }
 
 // Sostituisci con il tuo dominio Render
-const ws = new WebSocket('wss://tuo-servizio.onrender.com');
+const ws = new WebSocket('wss://spellcasters.onrender.com');
 
 ws.onopen = () => {
     console.log('✅ Connessione WebSocket riuscita!');
