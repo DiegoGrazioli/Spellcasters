@@ -21,8 +21,8 @@
     </div>
   </div>
   <script type="module">
-    import './main.js';
-    import { getPlayerData } from './player-db.js';
+    import './public/main.js';
+    import { getPlayerData } from './public/player-db.js';
     
     window.addEventListener("DOMContentLoaded", async () => {
       const player = await getPlayerData();
@@ -35,7 +35,7 @@
     document.getElementById('home-btn').onclick = () => {
       window.location.href = '/home.html';
     };
-    import { createThemeToggle, initTheme, getTheme } from './theme.js';
+    import { createThemeToggle, initTheme, getTheme } from './public/theme.js';
     initTheme();
     // Aggiorna la classe del body per il tema
     function updateBodyThemeClass() {
