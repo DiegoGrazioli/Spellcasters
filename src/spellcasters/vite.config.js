@@ -11,7 +11,8 @@ export default defineConfig({
         lab: 'lab.html',
         'player-info': 'player-info.html',
         arena: 'arena.html',
-        'element-pattern-preview': 'element-pattern-preview.html'
+        'element-pattern-preview': 'element-pattern-preview.html',
+        game: 'game.html'
       }
     }
   }
