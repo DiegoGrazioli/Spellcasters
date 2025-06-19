@@ -1,5 +1,5 @@
 import DollarRecognizer from "./dollarRecognizer";
-import { drawManaSegments, setManaValues, getManaValues, setCurrentMana, getCurrentMana, getManaMax, getManaRecoverSpeed } from "./Manabar";
+import { drawManaSegments, setManaValues, getManaValues, setCurrentMana, getCurrentMana, getManaMax, getManaRecoverSpeed } from "./manabar.js";
 import { setTheme } from "./theme.js";
 import { drawElementPattern, drawProjectilePolygonPattern } from "./element-patterns.js";
 import { loadPlayerFromDB, savePlayerData, getPlayerData } from "./player-db.js";
