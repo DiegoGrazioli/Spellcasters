@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   build: {
-    outDir: '../../dist',
+    outDir: 'dist',
     emptyOutDir: true,
     rollupOptions: {
       input: {
@@ -12,7 +12,6 @@ export default defineConfig({
         'player-info': 'player-info.html',
         arena: 'arena.html',
         'element-pattern-preview': 'element-pattern-preview.html'
-        // aggiungi altri html se necessario
       }
     }
   }
