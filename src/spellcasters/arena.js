@@ -66,6 +66,13 @@ function updateOnlinePlayers(count) {
     if (el) el.textContent = count;
 }
 
+socket.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  if (data.type === "onlinePlayers") {
+    document.getElementById('online-players').textContent = data.count;
+  }
+};
+
 window.addEventListener('DOMContentLoaded', async () => {
     const username = localStorage.getItem('currentPlayer');
     if (username) {
