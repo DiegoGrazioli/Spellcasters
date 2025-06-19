@@ -1,23 +1,43 @@
+body, html {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
 body {
-  background: linear-gradient(135deg, #e0e7ff 0%, #f0f0f0 100%);
+  background: var(--bg-color);
+  color: var(--text-color);
   font-family: 'Segoe UI', Arial, sans-serif;
   margin: 0;
   padding: 0;
   min-height: 100vh;
+  transition: background 0.7s cubic-bezier(.4,1.6,.4,1), color 0.7s cubic-bezier(.4,1.6,.4,1);
+}
+
+/* Modalità giorno */
+body.day {
+  --bg-color: #f0f4ff;
+  --text-color: #222;
+}
+
+/* Modalità notte */
+body.night {
+  --bg-color: #181c2a;
+  --text-color: #e0e7ff;
 }
 
 #arena-container {
+  min-height: 100vh;
+  min-width: 100vw;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
-  min-height: 100vh;
-  padding-top: 40px;
+  justify-content: center; /* centra verticalmente */
 }
 
 #arena-title {
   font-size: 2.2em;
-  color: #2d3a4b;
+  color: var(--home-title-color, #4f8cff);
   margin-bottom: 10px;
   letter-spacing: 1px;
   text-shadow: 0 2px 8px #bfcfff60;
@@ -25,16 +45,22 @@ body {
 
 #matchmaking-status {
   font-size: 1.3em;
-  color: #333;
+  color: var(--text-color);
   margin-bottom: 25px;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.277);
   border-radius: 8px;
   padding: 15px 30px;
   box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+  /* Centra il suo contenuto */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
 }
 
 #player-info {
-  background: #f8fafc;
+  background: rgba(255, 255, 255, 0.277);
   border: 1px solid #bfcfff;
   border-radius: 10px;
   padding: 18px 30px;
@@ -47,33 +73,40 @@ body {
 #player-info h2 {
   margin: 0 0 12px;
   font-size: 1.25em;
-  color: #3b4a6b;
+  color: var(--home-title-color, #4f8cff);
 }
 
 #player-info p {
   margin: 7px 0;
-  color: #444;
+  color: var(--text-color);
 }
 
 #arena-actions {
-  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+#training-btn,
+#matchmaking-btn {
+  align-self: center;
 }
 
 .main-btn, #start-game, #cancel-matchmaking {
   margin-top: 10px;
   padding: 12px 28px;
   font-size: 1.1em;
-  background: linear-gradient(90deg, #4f8cff 0%, #1e40af 100%);
+  background: var(--button-gradient, linear-gradient(90deg, #4f8cff 0%, #1e40af 100%));
   color: white;
   border: none;
   border-radius: 6px;
   cursor: pointer;
-  box-shadow: 0 2px 8px #4f8cff40;
+  box-shadow: var(--button-shadow, 0 2px 8px #4f8cff40);
   transition: background 0.2s, transform 0.2s;
 }
 
 .main-btn:hover, #start-game:hover, #cancel-matchmaking:hover {
-  background: linear-gradient(90deg, #1e40af 0%, #4f8cff 100%);
+  background: var(--button-gradient-hover, linear-gradient(90deg, #1e40af 0%, #4f8cff 100%));
   transform: translateY(-2px) scale(1.04);
 }
 
@@ -88,6 +121,11 @@ body {
   box-shadow: 0 1px 4px #4f8cff20;
 }
 
+body.night #online-players-count {
+  color: #00eaff;
+  background: #23233a;
+}
+
 #arena-animation {
   width: 100%;
   height: 400px;
@@ -95,4 +133,13 @@ body {
   background-size: cover;
   border-radius: 8px;
   margin-top: 20px;
+}
+
+#home-btn {
+  position: fixed;
+  top: 24px;
+  left: 24px;
+  z-index: 100;
+  padding: 10px 22px;
+  font-size: 1em;
 }

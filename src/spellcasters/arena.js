@@ -5,7 +5,7 @@ let players = [];
 let matchmakingStatus = 'Waiting for players...';
 
 function updateMatchmakingStatus() {
-    const statusElement = document.getElementById('matchmaking-status');
+    const statusElement = document.getElementById('status-message');
     statusElement.textContent = matchmakingStatus;
 }
 
@@ -24,6 +24,12 @@ function startMatchmaking() {
         }
         updateMatchmakingStatus();
     }, 3000);
+}
+
+function cancelMatchmaking() {
+  // Logica per annullare la ricerca avversario
+  matchmakingStatus = 'Matchmaking cancelled.';
+  updateMatchmakingStatus();
 }
 
 function connectPlayer(playerName) {
@@ -66,14 +72,15 @@ function updateOnlinePlayers(count) {
     if (el) el.textContent = count;
 }
 
-socket.onmessage = (event) => {
+ws.onmessage = (event) => {
   const data = JSON.parse(event.data);
   if (data.type === "onlinePlayers") {
-    document.getElementById('online-players').textContent = data.count;
+    updateOnlinePlayers(data.count);
   }
 };
 
 window.addEventListener('DOMContentLoaded', async () => {
+    initArenaTheme();
     const username = localStorage.getItem('currentPlayer');
     if (username) {
         const player = await getPlayerData(username);
@@ -82,4 +89,57 @@ window.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('level-value').textContent = player.livello;
         }
     }
+
+    // Pulsante Ricerca/Annulla Ricerca
+    const matchmakingBtn = document.getElementById('matchmaking-btn');
+    let isSearching = false;
+
+    matchmakingBtn.addEventListener('click', () => {
+        if (!isSearching) {
+            // Avvia la ricerca avversario
+            isSearching = true;
+            matchmakingBtn.textContent = 'Annulla Ricerca';
+            startMatchmaking(); // la tua funzione per avviare il matchmaking
+        } else {
+            // Annulla la ricerca avversario
+            isSearching = false;
+            matchmakingBtn.textContent = 'Ricerca';
+            cancelMatchmaking(); // la tua funzione per annullare il matchmaking
+        }
+    });
+
+    // Pulsante Home
+    document.getElementById('home-btn').addEventListener('click', () => {
+      window.location.href = 'home.html';
+    });
+
+    // Pulsante Training
+    document.getElementById('training-btn').addEventListener('click', () => {
+      // Avvia la simulazione di partita senza avversari
+      startTrainingMode(); // implementa questa funzione come preferisci
+    });
+});
+
+// --- Modalità Giorno/Notte ---
+function setArenaTheme(mode) {
+  const theme = mode === 'night' ? 'night' : 'day';
+  document.body.classList.remove('day', 'night');
+  document.body.classList.add(theme);
+  localStorage.setItem('mode', theme);
+}
+
+function initArenaTheme() {
+  const saved = localStorage.getItem('mode');
+  setArenaTheme(saved === 'night' ? 'night' : 'day');
+}
+
+// Scorciatoie tastiera
+window.addEventListener("keydown", (e) => {
+  if (e.key === 'n' || e.key === 'N') setArenaTheme('night');
+  if (e.key === 'g' || e.key === 'G') setArenaTheme('day');
+});
+
+document.getElementById('training-btn').addEventListener('click', () => {
+  // Passa una query string per indicare la modalità training
+  window.location.href = 'game.html?mode=training';
 });

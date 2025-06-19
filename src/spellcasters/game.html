@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Spellcasters - Game</title>
+  <link rel="stylesheet" href="./style-base.css">
+  <link rel="stylesheet" href="./style-buttons.css">
+  <link rel="stylesheet" href="./style-home.css">
+  <link rel="stylesheet" href="./style-modal.css">
+  <link rel="stylesheet" href="./style-expbar.css">
+</head>
+<body>
+  <!-- <button id="home-btn" class="btn-permanent">Home</button> -->
+  <div id="debug" class="hidden"></div>
+  <canvas id="spellCanvas"></canvas>
+  <div id="exp-bar-container">
+    <div id="exp-level">1</div>
+    <div class="exp-bar-bg">
+      <div id="exp-bar"></div>
+      <div class="exp-bar-glow"></div>
+    </div>
+  </div>
+  <script type="module" src="./main.js"></script>
+  <script>
+    // Funzione per ottenere la modalità dalla query string
+    function getGameMode() {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('mode') === 'training' ? 'training' : 'duel';
+    }
+
+    const gameMode = getGameMode();
+
+    let playerLife = 20;
+    let opponentLife = 20;
+
+    // Esempio di logica condizionale
+    if (gameMode === 'training') {
+        // Logica per la modalità training (nessun avversario reale, nessun matchmaking, ecc)
+    } else {
+        // Logica per il duello vero e proprio (connessione, matchmaking, ecc)
+    }
+  </script>
+  <script type="module">
+    import './main.js';
+    import { getPlayerData } from './player-db.js';
+    
+    window.addEventListener("DOMContentLoaded", async () => {
+      const player = await getPlayerData();
+      if (player && player.livello) {
+        const lvlElem = document.getElementById("exp-level"); // o "player-level"
+        if (lvlElem) lvlElem.textContent = player.livello;
+      }
+    });
+
+    import { createThemeToggle, initTheme, getTheme } from './theme.js';
+    initTheme();
+    // Aggiorna la classe del body per il tema
+    function updateBodyThemeClass() {
+      const theme = getTheme();
+      document.body.classList.remove('day', 'night');
+      document.body.classList.add(theme);
+    }
+    updateBodyThemeClass();
+    window.onThemeChange = updateBodyThemeClass;
+  </script>
+</body>
+</html>

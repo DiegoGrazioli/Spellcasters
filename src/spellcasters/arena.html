@@ -8,11 +8,12 @@
   <link rel="stylesheet" href="/style-arena.css">
 </head>
 <body>
-  <div id="arena-container" class="centered">
+  <button id="home-btn" class="main-btn">Home</button>
+  <div id="arena-container">
     <h1 id="arena-title">Arena Multiplayer</h1>
     <div id="matchmaking-status">
       <p id="status-message">In attesa di avversari...</p>
-      <button id="cancel-matchmaking" class="main-btn">Annulla Ricerca</button>
+      <button id="matchmaking-btn" class="main-btn">Ricerca</button>
     </div>
     <div id="player-info">
       <h2>Informazioni Giocatore</h2>
@@ -20,11 +21,7 @@
       <p id="player-level">Livello: <span id="level-value">1</span></p>
     </div>
     <div id="arena-actions">
-      <button id="start-game" class="main-btn">Inizia Partita</button>
-    </div>
-    <div style="margin-bottom: 20px;">
-      <span style="font-size:1.2em;vertical-align:middle;">🟢</span>
-      Player online: <span id="online-players-count">0</span>
+      <button id="training-btn" class="main-btn">Training</button>
     </div>
   </div>
   <script type="module" src="./arena.js"></script>
