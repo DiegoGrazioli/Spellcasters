@@ -40,7 +40,8 @@
       align-self: flex-start;
       font-size: 1rem;
     }
-    #switch-link {
+    #switch-link,
+    #switch-link2 {
       color: #00eaff;
       cursor: pointer;
       text-decoration: underline;
@@ -85,7 +86,7 @@
   </div>
   <script type="module">
     import { createThemeToggle, initTheme, getTheme } from './theme.js';
-    import { savePlayerData } from './player-db.js';
+    import { savePlayerData, getPlayerData } from './player-db.js';
     initTheme();
     // Aggiorna la classe del body per il tema
     function updateBodyThemeClass() {
@@ -147,19 +148,31 @@
       return p;
     }
     // Login
-    document.getElementById('login-form').onsubmit = function(e) {
+    document.getElementById('login-form').onsubmit = async function(e) {
       e.preventDefault();
-      const user = document.getElementById('login-username').value.trim();
+      const user = document.getElementById('login-username').value;
       const pw = document.getElementById('login-password').value;
-      const player = getPlayer(user);
+
+      let player = getPlayer(user);
+
+      if (!player) {
+        // Prova a recuperare da Firebase
+        player = await getPlayerData(user);
+        if (player) {
+          player.username = user;
+          savePlayer(player); // Salva localmente per i prossimi login
+        }
+      }
+
       if (!player || player.password !== encodePassword(pw)) {
         document.getElementById('login-error').textContent = 'Nome utente o password errati.';
         return;
       }
+
       localStorage.setItem('currentPlayer', user);
-      // Rimosso: setPlayerLevelData e drawExpBar (gestiti in home)
       window.location.href = '/home.html';
     };
+
     // Signup
     document.getElementById('signup-form').onsubmit = function(e) {
       e.preventDefault();
