@@ -53,23 +53,40 @@ const ws = new WebSocket('wss://spellcasters.onrender.com');
 
 ws.onopen = () => {
     console.log('✅ Connessione WebSocket riuscita!');
+    // Richiedi il numero di giocatori online appena connesso
+    ws.send(JSON.stringify({ type: 'requestOnlineCount' }));
 };
 
 ws.onmessage = (event) => {
     console.log('📨 Messaggio dal server:', event.data);
+    try {
+        const data = JSON.parse(event.data);
+        if (data.type === "onlinePlayers") {
+            updateOnlinePlayers(data.count);
+        }
+    } catch (e) {
+        console.log('Messaggio non JSON ricevuto:', event.data);
+    }
 };
 
 ws.onerror = (error) => {
     console.error('❌ Errore WebSocket:', error);
+    // Mostra 0 giocatori in caso di errore
+    updateOnlinePlayers(0);
 };
 
 ws.onclose = () => {
     console.log('🔌 Connessione WebSocket chiusa');
+    // Mostra 0 giocatori quando disconnesso
+    updateOnlinePlayers(0);
 };
 
 function updateOnlinePlayers(count) {
     const el = document.getElementById('online-players-count');
-    if (el) el.textContent = count;
+    if (el) {
+        el.textContent = count;
+        console.log(`👥 Giocatori online aggiornati: ${count}`);
+    }
 }
 
 ws.onmessage = (event) => {

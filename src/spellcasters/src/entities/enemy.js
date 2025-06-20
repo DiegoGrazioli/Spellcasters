@@ -172,17 +172,17 @@ export class Enemy {
         }
         ctx.restore();
         // Debug: disegna la hitbox quadrata
-        ctx.save();
-        ctx.strokeStyle = "rgba(255,0,0,0.7)";
-        ctx.lineWidth = 200;
-        ctx.translate(part.hitbox.x, part.hitbox.y);
-        ctx.strokeRect(
-        -part.hitbox.w/2,
-        -part.hitbox.h/2,
-        part.hitbox.w,
-        part.hitbox.h
-        );
-        ctx.restore();
+        // ctx.save();
+        // ctx.strokeStyle = "rgba(255,0,0,0.7)";
+        // ctx.lineWidth = 200;
+        // ctx.translate(part.hitbox.x, part.hitbox.y);
+        // ctx.strokeRect(
+        // -part.hitbox.w/2,
+        // -part.hitbox.h/2,
+        // part.hitbox.w,
+        // part.hitbox.h
+        // );
+        // ctx.restore();
     }
     ctx.restore();
     }
