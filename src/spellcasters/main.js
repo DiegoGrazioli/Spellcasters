@@ -3,6 +3,8 @@ import { drawManaSegments, setManaValues, getManaValues, setCurrentMana, getCurr
 import { setTheme } from "./theme.js";
 import { drawElementPattern, drawProjectilePolygonPattern } from "./element-patterns.js";
 import { loadPlayerFromDB, savePlayerData, getPlayerData } from "./player-db.js";
+import { CollisionSystem, VirtualMouseEntity, globalCollisionSystem } from "./collision-system.js";
+import { Spark } from "./sparks.js";
 
 const recognizer = new DollarRecognizer();
 
@@ -54,13 +56,10 @@ let virtualMouseSpeed = 16; // pixel per frame
 
 let mouseTarget = { x: virtualMouse.x, y: virtualMouse.y };
 
-document.addEventListener('DOMContentLoaded', () => {
-  // Cattura il mouse automaticamente quando il DOM è pronto
-  setTimeout(() => {
-    canvas.requestPointerLock();
-    canvas.focus();
-  }, 100);
-});
+let virtualMouseEntity = new VirtualMouseEntity(canvas.width / 2, canvas.height / 2);
+globalCollisionSystem.registerEntity(virtualMouseEntity);
+
+let collisionSparks = []; // Array globale per le scintille
 
 // === EVENTI CANVAS ===
 canvas.addEventListener("mousedown", (e) => {
@@ -845,12 +844,26 @@ function incrementaProiezioneUsataBuffer(tipo, valore = 1) {
 export function animate() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   updateVirtualMouse();
+  globalCollisionSystem.update();
+  updateCollisionSparks();
   drawVirtualMouse();
+
+  if (typeof window.drawTrainingEnemies === 'function') {
+    window.drawTrainingEnemies(ctx);
+  }
+
   if (casting) drawPath();
   updateParticles();
   drawParticles();
   drawFireParticles();
   drawMagicParticles();
+
+  window.createCollisionSparks = function(x, y, entity1, entity2, collision, impactForce) {
+    createCollisionSparks(x, y, entity1, entity2, collision, impactForce);
+  };
+
+  drawCollisionSparks(ctx);
+
   drawMagicCircle();
   drawLastProjectileParticles();
   updateProjectiles();
@@ -1106,6 +1119,18 @@ function updateVirtualMouse() {
   // Limita ai bordi del canvas
   virtualMouse.x = Math.max(0, Math.min(canvas.width, virtualMouse.x));
   virtualMouse.y = Math.max(0, Math.min(canvas.height, virtualMouse.y));
+
+  // Sincronizza l'entità di collisione con il mouse virtuale
+  virtualMouseEntity.x = virtualMouse.x;
+  virtualMouseEntity.y = virtualMouse.y;
+  
+  // Calcola la velocità per le collisioni basata sul movimento
+  const velocityX = (dx / dist) * speed;
+  const velocityY = (dy / dist) * speed;
+  if (!isNaN(velocityX) && !isNaN(velocityY)) {
+    virtualMouseEntity.velocity.x = velocityX;
+    virtualMouseEntity.velocity.y = velocityY;
+  }
 }
 
 function drawVirtualMouse() {
@@ -1122,6 +1147,67 @@ function drawVirtualMouse() {
   ctx.lineTo(virtualMouse.x, virtualMouse.y + 6);
   ctx.stroke();
   ctx.restore();
+}
+
+// Funzione per creare scintille da una collisione
+function createCollisionSparks(x, y, entity1, entity2, collision, impactForce) {
+  // Calcola l'intensità dell'impatto
+  const velocity1 = Math.hypot(entity1.velocity?.x || 0, entity1.velocity?.y || 0);
+  const velocity2 = Math.hypot(entity2.velocity?.x || 0, entity2.velocity?.y || 0);
+  const totalImpact = velocity1 + velocity2;
+  
+  // Determina il numero di scintille basato sull'impatto
+  const minSparks = 1;
+  const maxSparks = 3;
+  const sparkCount = Math.floor(minSparks + (totalImpact / 10) * (maxSparks - minSparks));
+  
+  // Calcola la direzione di movimento delle scintille
+  // Le scintille "rimbalzano" via dalla normale di collisione
+  const normalX = collision.normal?.x || 0;
+  const normalY = collision.normal?.y || 0;
+  
+  // Calcola velocità e lunghezza basate sull'impatto
+  const baseSpeed = Math.min(2 + totalImpact * 0.3, 8); // Velocità tra 2 e 8
+  const baseLength = Math.min(0.5 + totalImpact * 0.1, 2.5); // Lunghezza tra 0.5 e 2.5
+  
+  for (let i = 0; i < sparkCount; i++) {
+    // Calcola angolo di dispersione attorno alla normale
+    const spreadAngle = Math.PI * 0.6; // 108 gradi di dispersione
+    const angle = Math.atan2(normalY, normalX) + (Math.random() - 0.5) * spreadAngle;
+    
+    // Calcola velocità con variazione casuale
+    const speedVariation = 0.7 + Math.random() * 0.6; // Variazione 70%-130%
+    const speed = baseSpeed * speedVariation;
+    const vx = Math.cos(angle) * speed;
+    const vy = Math.sin(angle) * speed;
+    
+    // Calcola lunghezza con variazione più piccola
+    const lengthVariation = 0.8 + Math.random() * 0.4; // Variazione 80%-120%
+    const length = baseLength * lengthVariation;
+    
+    // Crea la scintilla
+    const spark = new Spark(x, y, vx, vy, length);
+    collisionSparks.push(spark);
+  }
+  
+  console.log(`Created ${sparkCount} sparks for collision with impact: ${totalImpact.toFixed(2)}`);
+}
+
+// Funzione per aggiornare tutte le scintille
+function updateCollisionSparks() {
+  for (let i = collisionSparks.length - 1; i >= 0; i--) {
+    const spark = collisionSparks[i];
+    if (!spark.update()) {
+      collisionSparks.splice(i, 1); // Rimuovi scintilla morta
+    }
+  }
+}
+
+// Funzione per disegnare tutte le scintille
+function drawCollisionSparks(ctx) {
+  for (const spark of collisionSparks) {
+    spark.draw(ctx);
+  }
 }
 
 animate();

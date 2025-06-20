@@ -8,11 +8,15 @@ enemySprites.eye.src = './src/img/square.png';
 enemySprites.limb.src = './src/img/square.png';
 
 export class Enemy {
-  constructor(x, y) {
+  constructor(x, y, type = 'normal') {
     this.x = x;
     this.y = y;
     this.state = 'idle';
     this.stateTimer = 0;
+    
+    // Configurazione del peso basata sul tipo
+    this.setupWeightProperties(type);
+    
     this.parts = {
       body: { img: enemySprites.body, x: 0, y: 0, rotation: 0, hitbox: { x: 0, y: 0, w: 500, h: 500 } },
       eye: { img: enemySprites.eye, x: 0, y: -800, rotation: 0, hitbox: { x: 0, y: -700, w: 300, h: 300 } },
@@ -22,6 +26,100 @@ export class Enemy {
     };
   }
 
+  setupWeightProperties(type) {
+    // Velocità per le collisioni
+    this.velocity = { x: 0, y: 0 };
+    this.type = 'enemy';
+    
+    // Configurazioni predefinite basate sul tipo
+    const weightConfigs = {
+      'dummy': {
+        mass: Infinity,           // Massa infinita
+        resistance: Infinity,     // Resistenza infinita
+        isImmovable: true,        // Completamente inamovibile
+        isStatic: false,          // Non è statico (può avere animazioni)
+        description: 'Manichino da allenamento - Inamovibile'
+      },
+      'light': {
+        mass: 1,
+        resistance: 0.5,
+        isImmovable: false,
+        isStatic: false,
+        description: 'Nemico leggero - Facile da spostare'
+      },
+      'normal': {
+        mass: 3,
+        resistance: 1.5,
+        isImmovable: false,
+        isStatic: false,
+        description: 'Nemico normale - Moderatamente pesante'
+      },
+      'heavy': {
+        mass: 8,
+        resistance: 2.5,
+        isImmovable: false,
+        isStatic: false,
+        description: 'Nemico pesante - Difficile da spostare'
+      },
+      'boss': {
+        mass: 15,
+        resistance: 4,
+        isImmovable: false,
+        isStatic: false,
+        description: 'Boss - Molto difficile da spostare'
+      },
+      'immovable_boss': {
+        mass: Infinity,
+        resistance: Infinity,
+        isImmovable: true,
+        isStatic: false,
+        description: 'Boss inamovibile - Impossibile da spostare'
+      }
+    };
+
+    const config = weightConfigs[type] || weightConfigs['normal'];
+    
+    // Applica la configurazione
+    this.mass = config.mass;
+    this.resistance = config.resistance;
+    this.isImmovable = config.isImmovable;
+    this.isStatic = config.isStatic;
+    this.weightType = type;
+    this.weightDescription = config.description;
+    
+    // Proprietà fisiche aggiuntive
+    this.restitution = 0.4; // Fattore di rimbalzo
+    this.friction = 0.85;   // Attrito
+    
+    console.log(`Enemy created: ${this.weightDescription}`);
+  }
+
+  // Metodo per cambiare il tipo di peso dinamicamente
+  setWeightType(newType) {
+    this.setupWeightProperties(newType);
+    console.log(`Enemy weight changed to: ${this.weightDescription}`);
+  }
+
+  // Callback per le collisioni
+  onCollision(otherEntity, collision, forceInfo) {
+    console.log(`Enemy hit by ${otherEntity.type}!`);
+    
+    if (this.isImmovable) {
+      console.log(`${otherEntity.type} tried to move immovable enemy!`);
+    } else if (forceInfo && forceInfo.canMove) {
+      console.log(`Enemy was moved by force: ${forceInfo.impactForce.toFixed(2)}`);
+      this.setState('get_hit');
+    } else {
+      console.log(`${otherEntity.type} wasn't strong enough to move this enemy`);
+    }
+  }
+
+  // Callback per la resistenza
+  onResistance(message) {
+    console.log(`Enemy resisted: ${message}`);
+    // Qui potresti aggiungere effetti visivi come scintille o tremolii
+  }
+  
   setState(newState) {
     this.state = newState;
     this.stateTimer = 0;
@@ -74,42 +172,45 @@ export class Enemy {
         }
         ctx.restore();
         // Debug: disegna la hitbox quadrata
-        // ctx.save();
-        // ctx.strokeStyle = "rgba(255,0,0,0.7)";
-        // ctx.lineWidth = 200;
-        // ctx.translate(part.hitbox.x, part.hitbox.y);
-        // ctx.strokeRect(
-        // -part.hitbox.w/2,
-        // -part.hitbox.h/2,
-        // part.hitbox.w,
-        // part.hitbox.h
-        // );
-        // ctx.restore();
+        ctx.save();
+        ctx.strokeStyle = "rgba(255,0,0,0.7)";
+        ctx.lineWidth = 200;
+        ctx.translate(part.hitbox.x, part.hitbox.y);
+        ctx.strokeRect(
+        -part.hitbox.w/2,
+        -part.hitbox.h/2,
+        part.hitbox.w,
+        part.hitbox.h
+        );
+        ctx.restore();
     }
     ctx.restore();
     }
 
     checkHit(x, y, damage = 1) {
-        let hit = false;
-        for (let partName in this.parts) {
-            const part = this.parts[partName];
-            // Calcola posizione globale della parte
-            const px = this.x + part.x;
-            const py = this.y + part.y;
-            // Trasforma il punto nel sistema locale della parte
-            const localX = x - px;
-            const localY = y - py;
-            // Controlla se il punto è dentro il rettangolo
-            if (
-            localX >= -part.hitbox.w / 2 &&
-            localX <= part.hitbox.w / 2 &&
-            localY >= -part.hitbox.h / 2 &&
-            localY <= part.hitbox.h / 2
-            ) {
-            hit = true;
-            // Effetti visivi o logica extra qui
-            }
-        }
-        return hit;
-    }
+      let hit = false;
+      const globalScale = 0.1; // lo stesso valore usato in draw()
+
+      for (let partName in this.parts) {
+          const part = this.parts[partName];
+          // Calcola posizione globale tenendo conto della scala
+          const px = this.x + (part.x * globalScale);
+          const py = this.y + (part.y * globalScale);
+
+          // Trasforma il punto in coordinate locali, includendo la scala
+          const localX = (x - px) / globalScale;
+          const localY = (y - py) / globalScale;
+
+          if (
+              localX >= -part.hitbox.w / 2 &&
+              localX <= part.hitbox.w / 2 &&
+              localY >= -part.hitbox.h / 2 &&
+              localY <= part.hitbox.h / 2
+          ) {
+              hit = true;
+              // Qui puoi aggiungere effetti visivi (scintille) o logica extra
+          }
+      }
+      return hit;
+  }
 }
