@@ -35,7 +35,12 @@
 
     // Esempio di logica condizionale
     if (gameMode === 'training') {
-        // Logica per la modalità training (nessun avversario reale, nessun matchmaking, ecc)
+        const homeBtn = document.createElement('button');
+        homeBtn.id = 'home-btn';
+        homeBtn.className = 'btn-permanent';
+        homeBtn.textContent = 'Home';
+        homeBtn.onclick = () => window.location.href = '/home.html';
+        document.body.insertBefore(homeBtn, document.body.firstChild);
     } else {
         // Logica per il duello vero e proprio (connessione, matchmaking, ecc)
     }
