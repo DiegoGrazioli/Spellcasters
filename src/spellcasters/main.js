@@ -814,7 +814,7 @@ function incrementaProiezioneUsataBuffer(tipo, valore = 1) {
 }
 
 // === ANIMATE LOOP ===
-function animate() {
+export function animate() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   if (casting) drawPath();
   updateParticles();
@@ -884,7 +884,7 @@ function animate() {
       }
       await savePlayerData(username, { proiezioniUsate: player.proiezioniUsate ?? {} });
       proiezioniToAdd = {};
-      lastProiezioniSave = now;z
+      lastProiezioniSave = now;
     })();
     drawExpBar();
   }
