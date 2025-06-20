@@ -33,9 +33,6 @@ let isActivatingMagicCircle = false;
 let magicCircleDragStart = null;
 let magicCircleDragEnd = null;
 
-let mouseX = 0;
-let mouseY = 0;
-
 let particleCount = Number(localStorage.getItem('particleCount')) || 60;
 
 let isDrawingSpaziale = false;
@@ -52,11 +49,29 @@ let lastProiezioniSave = Date.now();
 let expToAdd = 0;
 let lastExpSave = Date.now();
 
+let virtualMouse = { x: canvas.width / 2, y: canvas.height / 2 };
+let virtualMouseSpeed = 16; // pixel per frame
+
+let mouseTarget = { x: virtualMouse.x, y: virtualMouse.y };
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Cattura il mouse automaticamente quando il DOM è pronto
+  setTimeout(() => {
+    canvas.requestPointerLock();
+    canvas.focus();
+  }, 100);
+});
+
 // === EVENTI CANVAS ===
 canvas.addEventListener("mousedown", (e) => {
+  if (e.button === 2) {
+    simulateRightClick();
+    return;
+  }
+
   if (e.button !== 0 || !magicCircle) return;
-  const dx = e.offsetX - magicCircle.x;
-  const dy = e.offsetY - magicCircle.y;
+  const dx = virtualMouse.x - magicCircle.x;
+  const dy = virtualMouse.y - magicCircle.y;
   const dist = Math.hypot(dx, dy);
   if (dist > magicCircle.radius + 20) return;
   if (magicCircle.projections.length > 0) {
@@ -68,24 +83,33 @@ canvas.addEventListener("mousedown", (e) => {
     } else {
       isActivatingMagicCircle = true;
       magicCircleDragStart = { x: magicCircle.x, y: magicCircle.y };
-      magicCircleDragEnd = { x: e.offsetX, y: e.offsetY };
+      magicCircleDragEnd = { x: virtualMouse.x, y: virtualMouse.y };
     }
   }
 });
 
+canvas.addEventListener("click", () => {
+  canvas.requestPointerLock();
+  canvas.focus();
+});
+
 canvas.addEventListener("mousemove", (e) => {
-  const rect = canvas.getBoundingClientRect();
-  mouseX = e.clientX - rect.left;
-  mouseY = e.clientY - rect.top;
+  if (document.pointerLockElement === canvas) {
+    mouseTarget.x += e.movementX;
+    mouseTarget.y += e.movementY;
+    // Limita ai bordi del canvas se vuoi
+    mouseTarget.x = Math.max(0, Math.min(canvas.width, mouseTarget.x));
+    mouseTarget.y = Math.max(0, Math.min(canvas.height, mouseTarget.y));
+  }
   if (isDrawingSpaziale) {
-    spazialePolygonPoints.push({ x: mouseX, y: mouseY });
+    spazialePolygonPoints.push({ x: virtualMouse.x, y: virtualMouse.y });
     return;
   }
   if (isActivatingMagicCircle && magicCircle) {
-    magicCircleDragEnd = { x: e.offsetX, y: e.offsetY };
+    magicCircleDragEnd = { x: virtualMouse.x, y: virtualMouse.y };
   }
   if (casting) {
-    const point = { x: mouseX, y: mouseY };
+    const point = { x: virtualMouse.x, y: virtualMouse.y };
     points.push(point);
     particles.push(createParticle(point.x, point.y));
     if (points.length > 5) {
@@ -126,32 +150,6 @@ canvas.addEventListener("mouseup", (e) => {
   }
 });
 
-canvas.addEventListener("contextmenu", (e) => {
-  e.preventDefault();
-  const rect = canvas.getBoundingClientRect();
-  const mx = e.clientX - rect.left;
-  const my = e.clientY - rect.top;
-
-  // Cancella area spaziale se il click è dentro una di esse
-  for (let i = permanentSpazialeAreas.length - 1; i >= 0; i--) {
-    if (pointInPolygon({x: mx, y: my}, permanentSpazialeAreas[i].points)) {
-      permanentSpazialeAreas.splice(i, 1);
-      showDebugMessage("Area spaziale rimossa!");
-      return;
-    }
-  }
-
-  // Cancella cerchio magico se fuori dalle aree
-  if (!magicCircle) return;
-  const dx = mx - magicCircle.x;
-  const dy = my - magicCircle.y;
-  const dist = Math.hypot(dx, dy);
-  if (dist >= magicCircle.radius - 120 && dist <= magicCircle.radius) {
-    magicCircle = null;
-    showDebugMessage("Cerchio magico cancellato");
-  }
-});
-
 // === EVENTI TASTIERA ===
 window.addEventListener("keydown", (e) => {
   if ((e.key === "z" || e.key === "Z") && !casting) {
@@ -168,7 +166,37 @@ window.addEventListener("keyup", (e) => {
     recognizeSpell(points);
     points = [];
   }
+
+  if (e.key === 'x' || e.key === 'X') {
+    // Simula un clic destro alle coordinate del mouse virtuale
+    simulateRightClick();
+  }
 });
+
+function simulateRightClick() {
+  const mx = virtualMouse.x;
+  const my = virtualMouse.y;
+
+  // Cancella area spaziale se il click è dentro una di esse
+  for (let i = permanentSpazialeAreas.length - 1; i >= 0; i--) {
+    if (pointInPolygon({x: mx, y: my}, permanentSpazialeAreas[i].points)) {
+      permanentSpazialeAreas.splice(i, 1);
+      showDebugMessage("Area spaziale rimossa!");
+      return;
+    }
+  }
+
+  // Cancella cerchio magico se fuori dalle aree
+  if (!magicCircle) return;
+  console.log("Cerchio magico rimovibile: il mouse virtuale è nell'area di cancellazione.");
+  const dx = mx - magicCircle.x;
+  const dy = my - magicCircle.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist >= magicCircle.radius - 120 && dist <= magicCircle.radius) {
+    magicCircle = null;
+    showDebugMessage("Cerchio magico cancellato");
+  }
+}
 
 window.addEventListener("resize", resizeCanvas);
 
@@ -327,7 +355,7 @@ function drawMagicCircle() {
 }
 
 function showEffect(type) {
-  const mousePos = { x: mouseX, y: mouseY };
+  const mousePos = { x: virtualMouse.x, y: virtualMouse.y };
   let newParticles = [];
   const count = particleCount;
 
@@ -816,6 +844,8 @@ function incrementaProiezioneUsataBuffer(tipo, valore = 1) {
 // === ANIMATE LOOP ===
 export function animate() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  updateVirtualMouse();
+  drawVirtualMouse();
   if (casting) drawPath();
   updateParticles();
   drawParticles();
@@ -840,11 +870,12 @@ export function animate() {
       area.affinityTimer -= 1;
       // Calcolo proporzionale all'area
       const areaValue = polygonArea(area.points);
-      const affinityGain = 0.5 * (areaValue / 100000) * 0.0001;
+      const affinityGain = 0.5 * (areaValue / 1000) * 0.001;
       incrementaProiezioneUsataBuffer("spaziale", affinityGain);
 
       const element = getElementFromColor(area.color);
-      if (element) incrementaAffinitaBuffer(element, area.manaDrain); // <-- aggiorna qui, non ogni frame!
+      if (element) incrementaAffinitaBuffer(element, area.manaDrain);
+      if (!element) incrementaAffinitaBuffer("spaziale", area.manaDrain);
     }
   }
   if (manaToDrain > 0) {
@@ -992,7 +1023,7 @@ function activateSpazialeArea(points, color) {
       });
     }
   }
-
+  incrementaAffinitaBuffer("spaziale");
 }
 
 function drawPermanentSpazialeAreas() {
@@ -1052,6 +1083,45 @@ function getElementFromColor(color) {
     if (color.includes(hex.slice(1))) return el;
   }
   return null;
+}
+
+function updateVirtualMouse() {
+  // Calcola la distanza tra mouse reale (mouseTarget) e virtuale
+  const dx = mouseTarget.x - virtualMouse.x;
+  const dy = mouseTarget.y - virtualMouse.y;
+  const dist = Math.hypot(dx, dy);
+
+  // Fattore di velocità: più è grande la distanza, più il virtuale si muove velocemente
+  const maxSpeed = 40; // velocità massima per frame
+  const speed = Math.min(dist * 0.25, maxSpeed); // 0.25 è il fattore di proporzionalità
+
+  if (dist > 0.5) { // evita jitter quando è molto vicino
+    virtualMouse.x += (dx / dist) * speed;
+    virtualMouse.y += (dy / dist) * speed;
+  } else {
+    virtualMouse.x = mouseTarget.x;
+    virtualMouse.y = mouseTarget.y;
+  }
+
+  // Limita ai bordi del canvas
+  virtualMouse.x = Math.max(0, Math.min(canvas.width, virtualMouse.x));
+  virtualMouse.y = Math.max(0, Math.min(canvas.height, virtualMouse.y));
+}
+
+function drawVirtualMouse() {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(virtualMouse.x, virtualMouse.y, 12, 0, 2 * Math.PI);
+  ctx.strokeStyle = "#00e0ff";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(virtualMouse.x - 6, virtualMouse.y);
+  ctx.lineTo(virtualMouse.x + 6, virtualMouse.y);
+  ctx.moveTo(virtualMouse.x, virtualMouse.y - 6);
+  ctx.lineTo(virtualMouse.x, virtualMouse.y + 6);
+  ctx.stroke();
+  ctx.restore();
 }
 
 animate();
