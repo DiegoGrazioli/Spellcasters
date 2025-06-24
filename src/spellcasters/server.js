@@ -1,46 +1,587 @@
+// server.js - Sistema completo per matchmaking e duelli PvP
 import { WebSocketServer } from 'ws';
+import { v4 as uuidv4 } from 'uuid';
 
 const port = process.env.PORT || 8080;
 const wss = new WebSocketServer({ port });
 
-let players = [];
+// Strutture dati per gestire giocatori e partite
+let connectedPlayers = new Map(); // Map<websocket, playerData>
+let matchmakingQueue = []; // Array di giocatori in cerca di partita
+let activeMatches = new Map(); // Map<matchId, matchData>
+
+// Configurazione matchmaking
+const MATCHMAKING_CONFIG = {
+    LEVEL_TOLERANCE: 3, // Differenza massima di livello
+    WINRATE_TOLERANCE: 0.3, // Differenza massima di win rate (30%)
+    QUEUE_TIMEOUT: 30000, // 30 secondi prima di espandere i criteri
+    MATCH_TIMEOUT: 300000 // 5 minuti per partita
+};
 
 wss.on('connection', (ws) => {
-    console.log('Player connected.');
+    console.log('🔌 Nuovo giocatore connesso');
 
     ws.on('message', (message) => {
-        const data = JSON.parse(message);
-
-        if (data.type === 'join') {
-            const player = { id: players.length + 1, name: data.name, ws };
-            players.push(player);
-            console.log(`${data.name} joined the arena.`);
-            broadcastPlayers();
+        try {
+            const data = JSON.parse(message);
+            handleMessage(ws, data);
+        } catch (error) {
+            console.error('❌ Errore parsing messaggio:', error);
         }
     });
 
     ws.on('close', () => {
-        players = players.filter(player => player.ws !== ws);
-        console.log('Player disconnected.');
-        broadcastPlayers();
+        handlePlayerDisconnect(ws);
     });
 
-    broadcastOnlinePlayers();
+    // Invia il conteggio giocatori online
+    broadcastOnlineCount();
 });
 
-function broadcastPlayers() {
-    const playerList = players.map(player => ({ id: player.id, name: player.name }));
-    players.forEach(player => {
-        player.ws.send(JSON.stringify({ type: 'update', players: playerList }));
+function handleMessage(ws, data) {
+    switch (data.type) {
+        case 'register':
+            registerPlayer(ws, data);
+            break;
+        case 'requestOnlineCount':
+            sendOnlineCount(ws);
+            break;
+        case 'joinMatchmaking':
+            joinMatchmaking(ws, data);
+            break;
+        case 'leaveMatchmaking':
+            leaveMatchmaking(ws);
+            break;
+        case 'playerMove':
+            handlePlayerMove(ws, data);
+            break;
+        case 'projectileLaunch':
+            handleProjectileLaunch(ws, data);
+            break;
+        case 'magicCircleUpdate':
+            handleMagicCircleUpdate(ws, data);
+            break;
+        case 'playerCasting':
+            handlePlayerCasting(ws, data);
+            break;
+        case 'projectileHit':
+            handleProjectileHit(ws, data);
+            break;
+        default:
+            console.log('🤔 Tipo messaggio sconosciuto:', data.type);
+    }
+}
+
+function handlePlayerMove(ws, data) {
+    const player = connectedPlayers.get(ws);
+    if (!player || player.status !== 'in_game') return;
+
+    const match = activeMatches.get(player.currentMatch);
+    if (!match) return;
+
+    // Determina quale giocatore ha inviato l'azione
+    const isPlayer1 = match.players[0].id === player.id;
+    const playerKey = isPlayer1 ? 'player1' : 'player2';
+    const opponent = match.players[isPlayer1 ? 1 : 0];
+
+    // Aggiorna posizione nel game state
+    if (data.position) {
+        match.gameState[playerKey].position = data.position;
+    }
+    if (data.virtualMouse) {
+        match.gameState[playerKey].virtualMouse = data.virtualMouse;
+    }
+
+    console.log(`🚶 ${player.username} si muove: ${JSON.stringify(data.virtualMouse)}`);
+
+    // Invia aggiornamento all'avversario
+    if (opponent && opponent.ws && opponent.ws.readyState === 1) {
+        const moveUpdate = {
+            type: 'opponentMove',
+            virtualMouse: data.virtualMouse,
+            position: data.position,
+            playerRole: playerKey,
+            timestamp: data.timestamp || Date.now()
+        };
+        
+        opponent.ws.send(JSON.stringify(moveUpdate));
+        console.log(`📤 Movimento inviato a ${opponent.username}: ${JSON.stringify(data.virtualMouse)}`);
+    } else {
+        console.log('❌ Avversario non disponibile per ricevere movimento');
+    }
+}
+
+function handleProjectileLaunch(ws, data) {
+    const player = connectedPlayers.get(ws);
+    if (!player || player.status !== 'in_game') return;
+
+    const match = activeMatches.get(player.currentMatch);
+    if (!match) return;
+
+    // Determina quale giocatore ha inviato l'azione
+    const isPlayer1 = match.players[0].id === player.id;
+    const opponent = match.players[isPlayer1 ? 1 : 0];
+
+    console.log(`🚀 ${player.username} lancia proiettile: ${data.tipo}`);
+
+    // Invia proiettile all'avversario
+    if (opponent && opponent.ws && opponent.ws.readyState === 1) {
+        opponent.ws.send(JSON.stringify({
+            type: 'opponentProjectile',
+            start: data.start,
+            velocity: data.velocity,
+            color: data.color,
+            tipo: data.tipo,
+            element: data.element,
+            maxLife: data.maxLife,
+            timestamp: data.timestamp || Date.now()
+        }));
+        console.log(`📤 Proiettile inviato a ${opponent.username}`);
+    }
+}
+
+function handleMagicCircleUpdate(ws, data) {
+    const player = connectedPlayers.get(ws);
+    if (!player || player.status !== 'in_game') return;
+
+    const match = activeMatches.get(player.currentMatch);
+    if (!match) return;
+
+    // Determina quale giocatore ha inviato l'azione
+    const isPlayer1 = match.players[0].id === player.id;
+    const opponent = match.players[isPlayer1 ? 1 : 0];
+
+    // Invia aggiornamento cerchio magico all'avversario
+    if (opponent && opponent.ws && opponent.ws.readyState === 1) {
+        opponent.ws.send(JSON.stringify({
+            type: 'opponentMagicCircle',
+            magicCircle: data.magicCircle,
+            timestamp: data.timestamp || Date.now()
+        }));
+    }
+}
+
+function handlePlayerCasting(ws, data) {
+    const player = connectedPlayers.get(ws);
+    if (!player || player.status !== 'in_game') return;
+
+    const match = activeMatches.get(player.currentMatch);
+    if (!match) return;
+
+    // Determina quale giocatore ha inviato l'azione
+    const isPlayer1 = match.players[0].id === player.id;
+    const opponent = match.players[isPlayer1 ? 1 : 0];
+
+    // Invia stato casting all'avversario
+    if (opponent && opponent.ws && opponent.ws.readyState === 1) {
+        opponent.ws.send(JSON.stringify({
+            type: 'opponentCasting',
+            casting: data.casting,
+            castingPoints: data.castingPoints,
+            timestamp: data.timestamp || Date.now()
+        }));
+    }
+}
+
+function handleProjectileHit(ws, data) {
+    const player = connectedPlayers.get(ws);
+    if (!player || player.status !== 'in_game') return;
+
+    const match = activeMatches.get(player.currentMatch);
+    if (!match) return;
+
+    // Determina quale giocatore ha inviato l'azione
+    const isPlayer1 = match.players[0].id === player.id;
+    const playerKey = isPlayer1 ? 'player1' : 'player2';
+    const opponent = match.players[isPlayer1 ? 1 : 0];
+
+    // Aggiorna salute nel game state
+    if (data.target === playerKey) {
+        match.gameState[playerKey].health -= data.damage;
+    } else {
+        const opponentKey = isPlayer1 ? 'player2' : 'player1';
+        match.gameState[opponentKey].health -= data.damage;
+    }
+
+    // Invia conferma hit all'avversario
+    if (opponent && opponent.ws && opponent.ws.readyState === 1) {
+        opponent.ws.send(JSON.stringify({
+            type: 'projectileHit',
+            target: data.target,
+            damage: data.damage,
+            element: data.element,
+            timestamp: data.timestamp || Date.now()
+        }));
+    }
+
+    // Controlla se la partita è finita
+    if (match.gameState[playerKey].health <= 0) {
+        const winner = playerKey === 'player1' ? 'player2' : 'player1';
+        endMatch(match.id, 'health', winner);
+    } else if (match.gameState[isPlayer1 ? 'player2' : 'player1'].health <= 0) {
+        const winner = playerKey;
+        endMatch(match.id, 'health', winner);
+    }
+}
+
+function registerPlayer(ws, data) {
+    // Calcola winRate dinamicamente
+    const winRate = calculateWinRate(data.vittorie || 0, data.partite || 0);
+    
+    const playerData = {
+        id: uuidv4(),
+        username: data.username,
+        level: data.level || 1,
+        vittorie: data.vittorie || 0,
+        partite: data.partite || 0,
+        winRate: winRate, // Calcolato dinamicamente
+        ws: ws,
+        status: 'online',
+        currentMatch: null,
+        joinedAt: Date.now()
+    };
+
+    connectedPlayers.set(ws, playerData);
+    
+    ws.send(JSON.stringify({
+        type: 'registered',
+        playerId: playerData.id,
+        status: 'success'
+    }));
+
+    console.log(`✅ Giocatore registrato: ${playerData.username} (Liv. ${playerData.level}, WR: ${(winRate * 100).toFixed(1)}%)`);
+    broadcastOnlineCount();
+}
+
+function joinMatchmaking(ws, playerData) {
+    const player = connectedPlayers.get(ws);
+    if (!player) {
+        ws.send(JSON.stringify({
+            type: 'matchmakingError',
+            message: 'Giocatore non registrato'
+        }));
+        return;
+    }
+    
+    if (player.status !== 'online') {
+        ws.send(JSON.stringify({
+            type: 'matchmakingError',
+            message: 'Giocatore non valido o già in coda'
+        }));
+        return;
+    }
+
+    // Aggiorna i dati del giocatore con le statistiche più recenti
+    player.level = playerData.level || player.level;
+    player.vittorie = playerData.vittorie || player.vittorie;
+    player.partite = playerData.partite || player.partite;
+    player.winRate = calculateWinRate(player.vittorie, player.partite); // Ricalcola winRate
+    
+    player.status = 'matchmaking';
+    player.queueJoinTime = Date.now();
+    
+    matchmakingQueue.push(player);
+
+    ws.send(JSON.stringify({
+        type: 'matchmakingJoined',
+        queuePosition: matchmakingQueue.length,
+        estimatedWait: estimateWaitTime()
+    }));
+
+    console.log(`🔍 ${player.username} si è unito al matchmaking`);
+    
+    // Prova a trovare una partita
+    attemptMatchmaking();
+}
+
+function leaveMatchmaking(ws) {
+    const player = connectedPlayers.get(ws);
+    if (!player) return;
+
+    const index = matchmakingQueue.findIndex(p => p.id === player.id);
+    if (index !== -1) {
+        matchmakingQueue.splice(index, 1);
+        player.status = 'online';
+        
+        ws.send(JSON.stringify({
+            type: 'matchmakingLeft'
+        }));
+        
+        console.log(`❌ ${player.username} ha lasciato il matchmaking`);
+    }
+}
+
+function attemptMatchmaking() {
+    if (matchmakingQueue.length < 2) return;
+
+    for (let i = 0; i < matchmakingQueue.length - 1; i++) {
+        const player1 = matchmakingQueue[i];
+        
+        for (let j = i + 1; j < matchmakingQueue.length; j++) {
+            const player2 = matchmakingQueue[j];
+            
+            if (isValidMatch(player1, player2)) {
+                createMatch(player1, player2);
+                
+                // Rimuovi i giocatori dalla coda
+                matchmakingQueue.splice(j, 1); // Rimuovi il secondo per primo (indice più alto)
+                matchmakingQueue.splice(i, 1);
+                
+                console.log(`⚔️ Match creato: ${player1.username} vs ${player2.username}`);
+                return; // Esci dopo aver creato una partita
+            }
+        }
+    }
+}
+
+function isValidMatch(player1, player2) {
+    const now = Date.now();
+    const player1WaitTime = now - player1.queueJoinTime;
+    const player2WaitTime = now - player2.queueJoinTime;
+    
+    // Espandi i criteri di matchmaking se i giocatori aspettano da molto
+    const levelTolerance = MATCHMAKING_CONFIG.LEVEL_TOLERANCE + 
+        Math.floor(Math.max(player1WaitTime, player2WaitTime) / 10000);
+    
+    const winRateTolerance = MATCHMAKING_CONFIG.WINRATE_TOLERANCE + 
+        Math.max(player1WaitTime, player2WaitTime) / 100000;
+    
+    // Verifica compatibilità livello
+    const levelDiff = Math.abs(player1.level - player2.level);
+    if (levelDiff > levelTolerance) return false;
+    
+    // Verifica compatibilità win rate (solo se entrambi hanno giocato partite)
+    if (player1.partite > 0 && player2.partite > 0) { // Cambiato da totalMatches
+        const winRateDiff = Math.abs(player1.winRate - player2.winRate);
+        if (winRateDiff > winRateTolerance) return false;
+    }
+    
+    return true;
+}
+
+function createMatch(player1, player2) {
+    const matchId = uuidv4();
+    const matchData = {
+        id: matchId,
+        players: [player1, player2],
+        startTime: Date.now(),
+        status: 'active', // starting, active, finished
+        gameState: {
+            player1: {
+                id: player1.id,
+                username: player1.username,
+                level: player1.level,
+                health: 100,
+                mana: player1.level * 10,
+                position: { x: 200, y: 300 },
+                virtualMouse: { x: 200, y: 300 },
+                spells: [],
+                projectiles: []
+            },
+            player2: {
+                id: player2.id,
+                username: player2.username,
+                level: player2.level,
+                health: 100,
+                mana: player2.level * 10,
+                position: { x: 1000, y: 300 },
+                virtualMouse: { x: 1000, y: 300 },
+                spells: [],
+                projectiles: []
+            },
+            arena: {
+                width: 1200,
+                height: 600,
+                boundaries: [
+                    { x: 0, y: 0, width: 1200, height: 20 }, // Top
+                    { x: 0, y: 580, width: 1200, height: 20 }, // Bottom
+                    { x: 0, y: 0, width: 20, height: 600 }, // Left
+                    { x: 1180, y: 0, width: 20, height: 600 } // Right
+                ]
+            }
+        }
+    };
+
+    activeMatches.set(matchId, matchData);
+    
+    // Aggiorna lo stato dei giocatori
+    player1.status = 'in_game';
+    player1.currentMatch = matchId;
+    player2.status = 'in_game';
+    player2.currentMatch = matchId;
+
+    // Invia i dati della partita ai giocatori
+    const matchStartData = {
+        type: 'matchFound',
+        matchId: matchId,
+        opponent: {
+            username: player2.username,
+            level: player2.level,
+            winRate: player2.winRate
+        },
+        gameState: matchData.gameState,
+        playerRole: 'player1'
+    };
+
+    player1.ws.send(JSON.stringify(matchStartData));
+    
+    player2.ws.send(JSON.stringify({
+        ...matchStartData,
+        opponent: {
+            username: player1.username,
+            level: player1.level,
+            winRate: player1.winRate
+        },
+        playerRole: 'player2'
+    }));
+
+    // Avvia il timer della partita
+    setTimeout(() => {
+        if (activeMatches.has(matchId)) {
+            endMatch(matchId, 'timeout');
+        }
+    }, MATCHMAKING_CONFIG.MATCH_TIMEOUT);
+}
+
+function endMatch(matchId, reason, winner = null) {
+    const match = activeMatches.get(matchId);
+    if (!match) return;
+
+    match.status = 'finished';
+    match.endTime = Date.now();
+    match.duration = match.endTime - match.startTime;
+    match.endReason = reason;
+    match.winner = winner;
+
+    // Aggiorna le statistiche dei giocatori
+    const [player1, player2] = match.players;
+    
+    if (winner === 'player1') {
+        updatePlayerStats(player1, true);
+        updatePlayerStats(player2, false);
+    } else if (winner === 'player2') {
+        updatePlayerStats(player1, false);
+        updatePlayerStats(player2, true);
+    }
+
+    // Invia i risultati ai giocatori
+    const matchResults = {
+        type: 'matchEnded',
+        reason: reason,
+        winner: winner,
+        duration: match.duration,
+        finalGameState: match.gameState
+    };
+
+    if (player1.ws && player1.ws.readyState === 1) {
+        player1.ws.send(JSON.stringify(matchResults));
+    }
+    if (player2.ws && player2.ws.readyState === 1) {
+        player2.ws.send(JSON.stringify(matchResults));
+    }
+
+    // Riporta i giocatori online
+    player1.status = 'online';
+    player1.currentMatch = null;
+    player2.status = 'online';
+    player2.currentMatch = null;
+
+    // Rimuovi la partita dalle partite attive
+    activeMatches.delete(matchId);
+
+    console.log(`🏁 Match terminato: ${reason} - Vincitore: ${winner || 'Nessuno'}`);
+}
+
+function updatePlayerStats(player, won) {
+    // Qui dovresti salvare le statistiche nel database
+    // Per ora aggiorniamo solo i dati in memoria
+    const oldMatches = player.totalMatches || 0;
+    const oldWins = Math.floor(oldMatches * (player.winRate || 0));
+    
+    player.totalMatches = oldMatches + 1;
+    const newWins = oldWins + (won ? 1 : 0);
+    player.winRate = newWins / player.totalMatches;
+
+    console.log(`📊 ${player.username}: ${won ? 'Vittoria' : 'Sconfitta'} - WinRate: ${(player.winRate * 100).toFixed(1)}%`);
+}
+
+function handlePlayerDisconnect(ws) {
+    const player = connectedPlayers.get(ws);
+    if (!player) return;
+
+    console.log(`🔌 ${player.username} disconnesso`);
+
+    // Rimuovi dal matchmaking se presente
+    const queueIndex = matchmakingQueue.findIndex(p => p.id === player.id);
+    if (queueIndex !== -1) {
+        matchmakingQueue.splice(queueIndex, 1);
+    }
+
+    // Gestisci disconnessione durante partita
+    if (player.currentMatch) {
+        const match = activeMatches.get(player.currentMatch);
+        if (match && match.status === 'active') {
+            const opponent = match.players.find(p => p.id !== player.id);
+            if (opponent) {
+                opponent.ws.send(JSON.stringify({
+                    type: 'opponentDisconnected',
+                    message: 'Il tuo avversario si è disconnesso. Hai vinto per abbandono!'
+                }));
+                
+                endMatch(player.currentMatch, 'disconnect', 
+                    opponent.id === match.players[0].id ? 'player1' : 'player2');
+            }
+        }
+    }
+
+    connectedPlayers.delete(ws);
+    broadcastOnlineCount();
+}
+
+function estimateWaitTime() {
+    // Stima semplice basata sulla coda
+    const queueLength = matchmakingQueue.length;
+    return Math.max(5, queueLength * 10); // Minimo 5 secondi, +10 secondi per giocatore
+}
+
+function sendOnlineCount(ws) {
+    ws.send(JSON.stringify({
+        type: 'onlinePlayers',
+        count: connectedPlayers.size
+    }));
+}
+
+function broadcastOnlineCount() {
+    const totalOnline = connectedPlayers.size;
+    const playersReady = matchmakingQueue.length;
+    
+    const message = JSON.stringify({
+        type: 'playerCounts',
+        totalOnline: totalOnline,
+        playersReady: playersReady
+    });
+
+    connectedPlayers.forEach(player => {
+        if (player.ws && player.ws.readyState === 1) {
+            player.ws.send(message);
+        }
     });
 }
 
-function broadcastOnlinePlayers() {
-    const count = wss.clients.size;
-    const msg = JSON.stringify({ type: 'onlinePlayers', count });
-    wss.clients.forEach(client => {
-        if (client.readyState === 1) client.send(msg);
+// Pulizia periodica delle partite abbandonate
+setInterval(() => {
+    const now = Date.now();
+    activeMatches.forEach((match, matchId) => {
+        if (now - match.startTime > MATCHMAKING_CONFIG.MATCH_TIMEOUT) {
+            console.log(`🧹 Pulizia match scaduto: ${matchId}`);
+            endMatch(matchId, 'timeout');
+        }
     });
+}, 60000); // Ogni minuto
+
+function calculateWinRate(vittorie, partite) {
+    return partite > 0 ? (vittorie / partite) : 0;
 }
 
-console.log(`WebSocket server running on port ${port}`);
+console.log(`🚀 Server WebSocket avviato sulla porta ${port}`);
+console.log(`⚔️ Sistema matchmaking attivo`);

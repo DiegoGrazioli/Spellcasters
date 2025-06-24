@@ -1,0 +1,11 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Install WebSocket dependencies",
+			"type": "shell",
+			"command": "npm install ws uuid",
+			"group": "build"
+		}
+	]
+}
