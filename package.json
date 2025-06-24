@@ -7,6 +7,6 @@
     "ws": "^8.18.2"
   },
   "scripts": {
-    "start": "node src/spellcasters/src/server.js"
+    "start": "node src/spellcasters/server.js"
   }
 }
