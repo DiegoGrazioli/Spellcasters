@@ -10,62 +10,104 @@
   <link rel="stylesheet" href="./style-expbar.css">
 </head>
 <body>
-  <!-- <button id="home-btn" class="btn-permanent">Home</button> -->
   <div id="debug" class="hidden"></div>
   <canvas id="spellCanvas"></canvas>
-  <div id="exp-bar-container">
-    <div id="exp-level">1</div>
-    <div class="exp-bar-bg">
-      <div id="exp-bar"></div>
-      <div class="exp-bar-glow"></div>
+  
+  <!-- UI per modalità training -->
+  <div id="training-ui" class="hidden">
+    <button id="home-btn" class="btn-permanent">Home</button>
+    <div id="exp-bar-container">
+      <div id="exp-level">1</div>
+      <div class="exp-bar-bg">
+        <div id="exp-bar"></div>
+        <div class="exp-bar-glow"></div>
+      </div>
     </div>
   </div>
-  <script type="module" src="./training.js"></script>
+  
+  <!-- UI per modalità duel -->
+  <div id="duel-ui" class="hidden">
+    <button id="arena-btn" class="btn-permanent">Arena</button>
+    <div id="game-info">
+      <div id="match-info"></div>
+    </div>
+  </div>
+  
   <script>
-    // Funzione per ottenere la modalità dalla query string
+    // Gestione modalità di gioco
     function getGameMode() {
         const params = new URLSearchParams(window.location.search);
-        return params.get('mode') === 'training' ? 'training' : 'duel';
+        return params.get('mode') || 'training';
     }
-
-    const gameMode = getGameMode();
-
-    let playerLife = 20;
-    let opponentLife = 20;
-
-    // Esempio di logica condizionale
-    if (gameMode === 'training') {
-        const homeBtn = document.createElement('button');
-        homeBtn.id = 'home-btn';
-        homeBtn.className = 'btn-permanent';
-        homeBtn.textContent = 'Home';
-        homeBtn.onclick = () => window.location.href = '/home.html';
-        document.body.insertBefore(homeBtn, document.body.firstChild);
-    } else {
-        // Logica per il duello vero e proprio (connessione, matchmaking, ecc)
+    
+    window.gameMode = getGameMode();
+    console.log('Game mode:', window.gameMode);
+    
+    // Mostra UI appropriata
+    if (window.gameMode === 'training') {
+        document.getElementById('training-ui').classList.remove('hidden');
+        
+        // Pulsante home
+        document.getElementById('home-btn').onclick = () => {
+            window.location.href = 'home.html';
+        };
+    } else if (window.gameMode === 'duel') {
+        document.getElementById('duel-ui').classList.remove('hidden');
+        
+        // Pulsante arena
+        document.getElementById('arena-btn').onclick = () => {
+            window.location.href = 'arena.html';
+        };
+        
+        // Mostra info match
+        const params = new URLSearchParams(window.location.search);
+        const opponent = params.get('opponent');
+        const position = params.get('position');
+        
+        if (opponent) {
+            document.getElementById('match-info').innerHTML = `
+                <div>VS ${opponent}</div>
+                <div>Position: ${position}</div>
+            `;
+        }
     }
   </script>
+  
+  <!-- Carica script appropriato -->
   <script type="module">
-    import { getPlayerData } from './player-db.js';
+    // Usa la variabile gameMode già dichiarata nello script precedente
+    if (window.gameMode === 'training') {
+        import('./training.js');
+    } else if (window.gameMode === 'duel') {
+        import('./duel.js');
+    }
     
+    // Script comuni
+    import { getPlayerData } from './player-db.js';
+    import { createThemeToggle, initTheme, getTheme } from './theme.js';
+    
+    // Inizializzazione
     window.addEventListener("DOMContentLoaded", async () => {
-      const player = await getPlayerData();
-      if (player && player.livello) {
-        const lvlElem = document.getElementById("exp-level"); // o "player-level"
-        if (lvlElem) lvlElem.textContent = player.livello;
+      initTheme();
+      
+      // Aggiorna tema
+      function updateBodyThemeClass() {
+        const theme = getTheme();
+        document.body.classList.remove('day', 'night');
+        document.body.classList.add(theme);
+      }
+      updateBodyThemeClass();
+      window.onThemeChange = updateBodyThemeClass;
+      
+      // Carica dati player per training mode
+      if (window.gameMode === 'training') {
+        const player = await getPlayerData();
+        if (player && player.livello) {
+          const lvlElem = document.getElementById("exp-level");
+          if (lvlElem) lvlElem.textContent = player.livello;
+        }
       }
     });
-
-    import { createThemeToggle, initTheme, getTheme } from './theme.js';
-    initTheme();
-    // Aggiorna la classe del body per il tema
-    function updateBodyThemeClass() {
-      const theme = getTheme();
-      document.body.classList.remove('day', 'night');
-      document.body.classList.add(theme);
-    }
-    updateBodyThemeClass();
-    window.onThemeChange = updateBodyThemeClass;
   </script>
 </body>
 </html>

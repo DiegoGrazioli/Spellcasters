@@ -1210,4 +1210,42 @@ function drawCollisionSparks(ctx) {
   }
 }
 
+function createSpell(type, position, direction) {
+    const spell = {
+        id: Math.random().toString(36).substr(2, 9),
+        type: type,
+        position: { ...position },
+        direction: { ...direction },
+        damage: getSpellDamage(type),
+        owner: 'local',
+        active: true,
+        radius: 8,
+        speed: 300
+    };
+    
+    // Notifica il duel manager se in modalità duel
+    if (window.duelManager && window.duelManager.gameStarted) {
+        window.duelManager.onSpellCast(spell);
+    }
+    
+    return spell;
+}
+
+function getSpellDamage(spellType) {
+    const damages = {
+        'fire': 3,
+        'water': 2,
+        'earth': 4,
+        'air': 1
+    };
+    return damages[spellType] || 1;
+}
+
+// Aggiungi anche notifica per movimento del player
+function updatePlayerPosition(newPosition) {
+    if (window.duelManager && window.duelManager.gameStarted) {
+        window.duelManager.onPlayerMove(newPosition);
+    }
+}
+
 animate();
