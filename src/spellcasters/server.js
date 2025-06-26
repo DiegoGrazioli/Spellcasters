@@ -47,9 +47,11 @@ function handleMessage(ws, data) {
             sendOnlineCount(ws);
             break;
         case 'joinMatchmaking':
+        case 'startMatchmaking':
             joinMatchmaking(ws, data);
             break;
         case 'leaveMatchmaking':
+        case 'cancelMatchmaking':
             leaveMatchmaking(ws);
             break;
         case 'playerMove':
