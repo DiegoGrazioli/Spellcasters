@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   build: {
+    target: 'es2022', // Supporta top-level await
     outDir: 'dist',
     emptyOutDir: true,
     rollupOptions: {
@@ -15,5 +16,8 @@ export default defineConfig({
         game: 'game.html'
       }
     }
+  },
+  esbuild: {
+    target: 'es2022' // Supporta top-level await anche per esbuild
   }
 });

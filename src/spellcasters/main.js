@@ -5,6 +5,7 @@ import { drawElementPattern, drawProjectilePolygonPattern } from "./element-patt
 import { loadPlayerFromDB, savePlayerData, getPlayerData } from "./player-db.js";
 import { CollisionSystem, VirtualMouseEntity, globalCollisionSystem } from "./collision-system.js";
 import { Spark } from "./sparks.js";
+import { PvPManager } from "./pvp-manager.js";
 
 const recognizer = new DollarRecognizer();
 
@@ -60,6 +61,29 @@ let virtualMouseEntity = new VirtualMouseEntity(canvas.width / 2, canvas.height 
 globalCollisionSystem.registerEntity(virtualMouseEntity);
 
 let collisionSparks = []; // Array globale per le scintille
+
+let pvpManager = null;
+let gameMode = 'training'; // 'training', 'pvp'
+let isInPvPMatch = false;
+
+function initializeGameMode() {
+    const params = new URLSearchParams(window.location.search);
+    gameMode = params.get('mode') || 'training';
+    
+    if (gameMode === 'pvp') {
+        // Verifica se ci sono dati di match
+        const matchData = localStorage.getItem('currentMatchData');
+        if (matchData) {
+            isInPvPMatch = true;
+            pvpManager = new PvPManager(canvas, ctx);
+            console.log('🎮 Modalità PvP inizializzata');
+        } else {
+            console.error('❌ Dati match non trovati, tornando al training');
+            gameMode = 'training';
+            window.location.href = 'game.html?mode=training';
+        }
+    }
+}
 
 // === EVENTI CANVAS ===
 canvas.addEventListener("mousedown", (e) => {
@@ -461,6 +485,8 @@ function launchProjectile(start, end, colorOverride, tipoProiezione = "proiettil
   const vx = (dx / dist) * speed;
   const vy = (dy / dist) * speed;
   const color = colorOverride || 'rgba(120,220,255,';
+  
+  // Effetto particelle di lancio
   for (let i = 0; i < 80; i++) {
     activeMagicParticles.push({
       x: start.x + (Math.random() - 0.5) * 22,
@@ -472,6 +498,7 @@ function launchProjectile(start, end, colorOverride, tipoProiezione = "proiettil
       color: color,
     });
   }
+  
   let maxT = 1;
   if (vx !== 0 || vy !== 0) {
     const tx = vx > 0 ? (canvas.width - start.x) / vx : (0 - start.x) / vx;
@@ -480,7 +507,8 @@ function launchProjectile(start, end, colorOverride, tipoProiezione = "proiettil
     if (tArr.length > 0) maxT = Math.min(...tArr);
   }
   const maxLife = Math.max(30, Math.floor(maxT));
-  projectiles.push({
+  
+  const projectile = {
     x: start.x,
     y: start.y,
     vx,
@@ -488,8 +516,24 @@ function launchProjectile(start, end, colorOverride, tipoProiezione = "proiettil
     life: maxLife,
     alpha: 1,
     color,
-    tipo: tipoProiezione
-  });
+    tipo: tipoProiezione,
+    owner: gameMode === 'pvp' ? 'local' : 'training', // Identifica il proprietario
+    element: infusedElement // Aggiungi elemento per calcolo danno
+  };
+  
+  projectiles.push(projectile);
+  
+  // Invia al server PvP se in modalità PvP
+  if (pvpManager && pvpManager.isActive()) {
+    pvpManager.sendProjectileLaunch({
+      start,
+      end,
+      color: colorOverride,
+      tipo: tipoProiezione,
+      element: infusedElement
+    });
+  }
+  
   incrementaProiezioneUsataBuffer("proiettile");
 }
 
@@ -500,6 +544,8 @@ function updateProjectiles() {
     p.y += p.vy;
     p.life--;
     p.alpha *= 0.97;
+    
+    // Genera particelle di scia
     for (let j = 0; j < 8; j++) {
       activeMagicParticles.push({
         x: p.x + (Math.random() - 0.5) * 18,
@@ -511,6 +557,13 @@ function updateProjectiles() {
         color: p.color || 'rgba(120,220,255,',
       });
     }
+    
+    // Verifica collisioni PvP
+    if (pvpManager && pvpManager.isActive()) {
+      pvpManager.checkProjectileCollisions([p]);
+    }
+    
+    // Rimuovi proiettili scaduti o fuori schermo
     if (p.life <= 0 || p.x < 0 || p.x > canvas.width || p.y < 0 || p.y > canvas.height) {
       projectiles.splice(i, 1);
     }
@@ -848,8 +901,8 @@ export function animate() {
   updateCollisionSparks();
   drawVirtualMouse();
 
-  if (typeof window.drawTrainingEnemies === 'function') {
-    window.drawTrainingEnemies(ctx);
+  if (gameMode === 'training' && typeof window.drawTrainingEnemies === 'function') {
+      window.drawTrainingEnemies(ctx);
   }
 
   if (casting) drawPath();
@@ -857,6 +910,21 @@ export function animate() {
   drawParticles();
   drawFireParticles();
   drawMagicParticles();
+
+  if (pvpManager && pvpManager.isActive()) {
+    // Sincronizza tutto lo stato di gioco con il PvP manager
+    pvpManager.syncWithMainGame({
+      virtualMouse: virtualMouse,
+      projectiles: projectiles,
+      magicCircle: magicCircle,
+      activeMagicParticles: activeMagicParticles,
+      casting: casting,
+      castingPoints: points
+    });
+    
+    // Renderizza elementi PvP
+    pvpManager.renderPvPElements(ctx);
+  }
 
   window.createCollisionSparks = function(x, y, entity1, entity2, collision, impactForce) {
     createCollisionSparks(x, y, entity1, entity2, collision, impactForce);
@@ -883,7 +951,7 @@ export function animate() {
       area.affinityTimer -= 1;
       // Calcolo proporzionale all'area
       const areaValue = polygonArea(area.points);
-      const affinityGain = 0.5 * (areaValue / 1000) * 0.001;
+      const affinityGain = 0.5 * (areaValue / 700) * 0.01;
       incrementaProiezioneUsataBuffer("spaziale", affinityGain);
 
       const element = getElementFromColor(area.color);
@@ -1210,42 +1278,5 @@ function drawCollisionSparks(ctx) {
   }
 }
 
-function createSpell(type, position, direction) {
-    const spell = {
-        id: Math.random().toString(36).substr(2, 9),
-        type: type,
-        position: { ...position },
-        direction: { ...direction },
-        damage: getSpellDamage(type),
-        owner: 'local',
-        active: true,
-        radius: 8,
-        speed: 300
-    };
-    
-    // Notifica il duel manager se in modalità duel
-    if (window.duelManager && window.duelManager.gameStarted) {
-        window.duelManager.onSpellCast(spell);
-    }
-    
-    return spell;
-}
-
-function getSpellDamage(spellType) {
-    const damages = {
-        'fire': 3,
-        'water': 2,
-        'earth': 4,
-        'air': 1
-    };
-    return damages[spellType] || 1;
-}
-
-// Aggiungi anche notifica per movimento del player
-function updatePlayerPosition(newPosition) {
-    if (window.duelManager && window.duelManager.gameStarted) {
-        window.duelManager.onPlayerMove(newPosition);
-    }
-}
-
+initializeGameMode();
 animate();

@@ -47,6 +47,7 @@ export async function savePlayerData(username, data) {
     // Qui puoi inizializzare tutti i campi di default!
     player = {
       username,
+      password: data.password || '',
       esperienza: 0,
       livello: 1,
       affinita: {},

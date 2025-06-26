@@ -1,370 +1,377 @@
-// arena.js - Gestione matchmaking e partite lato client
+// arena.js - Sistema client per matchmaking e duelli
 import { getPlayerData, savePlayerData } from './player-db.js';
 
-let players = [];
-let matchmakingStatus = 'Waiting for players...';
-let isSearching = false;
-let currentMatch = null;
-let ws = null;
-
-function updateMatchmakingStatus() {
-    const statusElement = document.getElementById('status-message');
-    if (statusElement) {
-        statusElement.textContent = matchmakingStatus;
+class ArenaManager {
+    constructor() {
+        this.ws = null;
+        this.playerId = null;
+        this.currentMatch = null;
+        this.playerData = null;
+        this.isConnected = false;
+        this.matchmakingStatus = 'idle'; // idle, searching, found, in_game
+        
+        this.initializeUI();
+        this.connectToServer();
     }
-}
 
-function connectToServer() {
-    // Sostituisci con il tuo dominio Render
-    ws = new WebSocket('wss://spellcasters.onrender.com');
-    
-    ws.onopen = () => {
-        console.log('✅ Connessione WebSocket riuscita!');
-        // Invia dati del player al server
-        sendPlayerJoinData();
-        // Richiedi il numero di giocatori online
-        ws.send(JSON.stringify({ type: 'requestOnlineCount' }));
-    };
-    
-    ws.onmessage = (event) => {
+    async initializeUI() {
+        // Carica dati giocatore
+        const username = localStorage.getItem('currentPlayer');
+        if (username) {
+            this.playerData = await getPlayerData(username);
+            if (this.playerData) {
+                document.getElementById('name-value').textContent = this.playerData.username;
+                document.getElementById('level-value').textContent = this.playerData.livello || 1;
+                
+                // Mostra statistiche se disponibili
+                this.updatePlayerStats();
+            }
+        }
+
+        // Setup event listeners
+        this.setupEventListeners();
+        
+        // Inizializza tema
+        this.initArenaTheme();
+    }
+
+    updatePlayerStats() {
+        const statsContainer = document.getElementById('player-stats');
+        if (!statsContainer) {
+            // Crea container statistiche se non esiste
+            const playerInfo = document.getElementById('player-info');
+            const stats = document.createElement('div');
+            stats.id = 'player-stats';
+            stats.innerHTML = `
+                <h3>Statistiche PvP</h3>
+                <p>Partite giocate: <span id="total-matches">0</span></p>
+                <p>Vittorie: <span id="total-wins">0</span></p>
+                <p>Win Rate: <span id="win-rate">0%</span></p>
+            `;
+            playerInfo.appendChild(stats);
+        }
+
+        const totalMatches = this.playerData.totalMatches || 0;
+        const winRate = this.playerData.winRate || 0;
+        const totalWins = Math.floor(totalMatches * winRate);
+
+        document.getElementById('total-matches').textContent = totalMatches;
+        document.getElementById('total-wins').textContent = totalWins;
+        document.getElementById('win-rate').textContent = `${(winRate * 100).toFixed(1)}%`;
+    }
+
+    setupEventListeners() {
+        // Pulsante matchmaking
+        const matchmakingBtn = document.getElementById('matchmaking-btn');
+        matchmakingBtn.addEventListener('click', () => {
+            this.toggleMatchmaking();
+        });
+
+        // Pulsante home
+        document.getElementById('home-btn').addEventListener('click', () => {
+            this.leaveMatchmaking();
+            window.location.href = 'home.html';
+        });
+
+        // Pulsante training
+        document.getElementById('training-btn').addEventListener('click', () => {
+            window.location.href = 'game.html?mode=training';
+        });
+
+        // Scorciatoie tastiera
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'n' || e.key === 'N') this.setArenaTheme('night');
+            if (e.key === 'g' || e.key === 'G') this.setArenaTheme('day');
+        });
+
+        // Gestione chiusura pagina
+        window.addEventListener('beforeunload', () => {
+            this.leaveMatchmaking();
+            if (this.ws) {
+                this.ws.close();
+            }
+        });
+    }
+
+    connectToServer() {
+        const wsUrl = 'wss://spellcasters.onrender.com'; // O localhost per development
+        // const wsUrl = 'ws://localhost:8080'; // Cambia con il tuo server WebSocket
+        
         try {
-            const data = JSON.parse(event.data);
-            handleServerMessage(data);
-        } catch (e) {
-            console.log('Messaggio non JSON ricevuto:', event.data);
+            this.ws = new WebSocket(wsUrl);
+            
+            this.ws.onopen = () => {
+                console.log('✅ Connesso al server arena');
+                this.isConnected = true;
+                this.registerPlayer();
+                this.updateConnectionStatus('Connesso');
+            };
+
+            this.ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    this.handleServerMessage(data);
+                } catch (error) {
+                    console.error('❌ Errore parsing messaggio server:', error);
+                }
+            };
+
+            this.ws.onerror = (error) => {
+                console.error('❌ Errore WebSocket:', error);
+                this.updateConnectionStatus('Errore connessione');
+            };
+
+            this.ws.onclose = () => {
+                console.log('🔌 Connessione chiusa');
+                this.isConnected = false;
+                this.updateConnectionStatus('Disconnesso');
+                this.updateOnlineCount(0);
+                
+                // Riprova la connessione dopo 5 secondi
+                setTimeout(() => {
+                    if (!this.isConnected) {
+                        this.connectToServer();
+                    }
+                }, 5000);
+            };
+
+        } catch (error) {
+            console.error('❌ Errore creazione WebSocket:', error);
+            this.updateConnectionStatus('Impossibile connettersi');
         }
-    };
-    
-    ws.onerror = (error) => {
-        console.error('❌ Errore WebSocket:', error);
-        updateOnlinePlayers(0);
-    };
-    
-    ws.onclose = () => {
-        console.log('🔌 Connessione WebSocket chiusa');
-        updateOnlinePlayers(0);
-        
-        // Riconnessione automatica dopo 3 secondi
-        setTimeout(() => {
-            if (!ws || ws.readyState === WebSocket.CLOSED) {
-                connectToServer();
-            }
-        }, 3000);
-    };
-}
-
-async function sendPlayerJoinData() {
-    const username = localStorage.getItem('currentPlayer');
-    if (!username || !ws) return;
-    
-    const playerData = await getPlayerData(username);
-    if (playerData) {
-        ws.send(JSON.stringify({
-            type: 'join',
-            username: playerData.username,
-            level: playerData.livello || 1,
-            stats: {
-                vittorie: playerData.vittorie || 0,
-                partite: playerData.partite || 0
-            }
-        }));
     }
-}
 
-function handleServerMessage(data) {
-    switch (data.type) {
-        case 'onlinePlayers':
-            updateOnlinePlayers(data.count);
-            break;
-            
-        case 'playersUpdate':
-            updatePlayersList(data.players);
-            break;
-            
-        case 'matchmakingStatus':
-            handleMatchmakingStatus(data);
-            break;
-            
-        case 'matchFound':
-            handleMatchFound(data);
-            break;
-            
-        case 'gameStart':
-            handleGameStart(data);
-            break;
-            
-        case 'opponentDisconnected':
-            handleOpponentDisconnected(data);
-            break;
-            
-        case 'gameEnd':
-            handleGameEnd(data);
-            break;
-    }
-}
-
-function handleMatchmakingStatus(data) {
-    matchmakingStatus = data.message;
-    updateMatchmakingStatus();
-    
-    if (data.status === 'searching') {
-        // Continua ad animare la ricerca
-        animateSearching();
-    }
-}
-
-function handleMatchFound(data) {
-    currentMatch = data;
-    matchmakingStatus = `Match found! Opponent: ${data.opponent.username} (Level ${data.opponent.level})`;
-    updateMatchmakingStatus();
-    
-    // Disabilita il pulsante di ricerca
-    const matchmakingBtn = document.getElementById('matchmaking-btn');
-    if (matchmakingBtn) {
-        matchmakingBtn.disabled = true;
-        matchmakingBtn.textContent = 'Match Found!';
-    }
-    
-    // Countdown prima dell'inizio
-    let countdown = 3;
-    const countdownInterval = setInterval(() => {
-        matchmakingStatus = `Game starting in ${countdown}...`;
-        updateMatchmakingStatus();
-        countdown--;
-        
-        if (countdown < 0) {
-            clearInterval(countdownInterval);
-        }
-    }, 1000);
-}
-
-function handleGameStart(data) {
-    // Reindirizza alla pagina di gioco con i parametri della partita
-    const gameParams = new URLSearchParams({
-        mode: 'duel',
-        gameId: data.gameState.gameId,
-        position: currentMatch.yourPosition,
-        opponent: currentMatch.opponent.username
-    });
-    
-    window.location.href = `game.html?${gameParams.toString()}`;
-}
-
-function handleOpponentDisconnected(data) {
-    alert(data.message);
-    resetMatchmaking();
-}
-
-function handleGameEnd(data) {
-    const username = localStorage.getItem('currentPlayer');
-    const isWinner = data.winner === username;
-    
-    // Aggiorna le statistiche locali
-    updatePlayerStats(isWinner);
-    
-    // Mostra risultato
-    const message = isWinner ? 
-        `🎉 Victory! You defeated ${data.loser}!` :
-        `💀 Defeat! You were defeated by ${data.winner}!`;
-    
-    alert(message);
-    resetMatchmaking();
-}
-
-async function updatePlayerStats(isWinner) {
-    const username = localStorage.getItem('currentPlayer');
-    if (!username) return;
-    
-    const playerData = await getPlayerData(username);
-    if (playerData) {
-        playerData.partite = (playerData.partite || 0) + 1;
-        if (isWinner) {
-            playerData.vittorie = (playerData.vittorie || 0) + 1;
-            playerData.esperienza = (playerData.esperienza || 0) + 100; // Bonus vittoria
-        } else {
-            playerData.esperienza = (playerData.esperienza || 0) + 25; // Consolazione
-        }
-        
-        // Calcola nuovo livello se necessario
-        const newLevel = Math.floor(playerData.esperienza / 1000) + 1;
-        if (newLevel > playerData.livello) {
-            playerData.livello = newLevel;
-            alert(`🎊 Level Up! You are now level ${newLevel}!`);
-        }
-        
-        await savePlayerData(username, playerData);
-        
-        // Aggiorna l'interfaccia
-        updatePlayerDisplay(playerData);
-    }
-}
-
-function startMatchmaking() {
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-        matchmakingStatus = 'Connection error. Please try again.';
-        updateMatchmakingStatus();
-        return;
-    }
-    
-    isSearching = true;
-    matchmakingStatus = 'Searching for opponents...';
-    updateMatchmakingStatus();
-    
-    ws.send(JSON.stringify({ type: 'startMatchmaking' }));
-    
-    // Animazione di ricerca
-    animateSearching();
-}
-
-function cancelMatchmaking() {
-    if (!ws || ws.readyState !== WebSocket.OPEN) return;
-    
-    isSearching = false;
-    ws.send(JSON.stringify({ type: 'cancelMatchmaking' }));
-    resetMatchmaking();
-}
-
-function resetMatchmaking() {
-    isSearching = false;
-    currentMatch = null;
-    matchmakingStatus = 'Ready to search for opponents';
-    updateMatchmakingStatus();
-    
-    const matchmakingBtn = document.getElementById('matchmaking-btn');
-    if (matchmakingBtn) {
-        matchmakingBtn.disabled = false;
-        matchmakingBtn.textContent = 'Search Match';
-    }
-}
-
-function animateSearching() {
-    if (!isSearching) return;
-    
-    const dots = ['', '.', '..', '...'];
-    let dotIndex = 0;
-    
-    const interval = setInterval(() => {
-        if (!isSearching) {
-            clearInterval(interval);
+    registerPlayer() {
+        if (!this.ws || !this.playerData) {
+            console.error('❌ Impossibile registrare: ws o playerData mancanti', {
+                ws: !!this.ws,
+                playerData: !!this.playerData
+            });
             return;
         }
-        
-        matchmakingStatus = `Searching for opponents${dots[dotIndex]}`;
-        updateMatchmakingStatus();
-        dotIndex = (dotIndex + 1) % dots.length;
-    }, 500);
-}
 
-function updateOnlinePlayers(count) {
-    const el = document.getElementById('online-players-count');
-    if (el) {
-        el.textContent = count;
-        console.log(`👥 Giocatori online aggiornati: ${count}`);
+        const registrationData = {
+            type: 'register',
+            username: this.playerData.username,
+            level: this.playerData.livello || 1,
+            winRate: this.playerData.winRate || 0,
+            totalMatches: this.playerData.totalMatches || 0
+        };
+
+        console.log('📤 Invio registrazione:', registrationData);
+        this.ws.send(JSON.stringify(registrationData));
+    }
+
+    handleServerMessage(data) {
+        console.log('📨 Messaggio dal server:', data);
+        
+        switch (data.type) {
+            case 'registered':
+                this.playerId = data.playerId;
+                console.log('✅ Registrato sul server con ID:', this.playerId);
+                this.updateStatusMessage('Registrato - Pronto per il matchmaking');
+                break;
+
+            case 'onlinePlayers':
+                this.updateOnlineCount(data.count);
+                break;
+
+            case 'matchmakingJoined':
+                this.matchmakingStatus = 'searching';
+                this.updateMatchmakingUI();
+                this.updateStatusMessage(`In coda... Posizione: ${data.queuePosition}`);
+                break;
+
+            case 'matchmakingLeft':
+                this.matchmakingStatus = 'idle';
+                this.updateMatchmakingUI();
+                this.updateStatusMessage('Ricerca annullata');
+                break;
+
+            case 'matchFound':
+                this.handleMatchFound(data);
+                break;
+
+            case 'matchmakingError':
+                console.error('❌ Errore matchmaking dal server:', data.message);
+                this.updateStatusMessage(`Errore: ${data.message}`);
+                this.matchmakingStatus = 'idle';
+                this.updateMatchmakingUI();
+                break;
+            
+            case 'playerCounts':
+                this.updateOnlineCount(data.totalOnline);
+                this.updateReadyCount(data.playersReady);
+                break;
+
+            default:
+                console.log('📨 Messaggio server non gestito:', data.type);
+        }
+    }
+
+    updateReadyCount(count) {
+        const element = document.getElementById('ready-players-count');
+        if (element) {
+            element.textContent = count;
+        }
+    }
+
+    handleMatchFound(data) {
+        this.currentMatch = data.matchId;
+        this.matchmakingStatus = 'found';
+        
+        const opponent = data.opponent;
+        this.updateStatusMessage(`Match trovato! Avversario: ${opponent.username} (Liv. ${opponent.level})`);
+        
+        // Mostra informazioni match per qualche secondo prima di iniziare
+        setTimeout(() => {
+            this.startMatch(data);
+        }, 3000);
+    }
+
+    startMatch(matchData) {
+        // Salva i dati del match in localStorage per la pagina di gioco
+        localStorage.setItem('currentMatchData', JSON.stringify({
+            matchId: matchData.matchId,
+            opponent: matchData.opponent,
+            gameState: matchData.gameState,
+            playerRole: matchData.playerRole,
+            mode: 'pvp'
+        }));
+
+        // Naviga alla pagina di gioco
+        window.location.href = 'game.html?mode=pvp';
+    }
+
+    toggleMatchmaking() {
+        if (!this.isConnected) {
+            this.updateStatusMessage('Errore: non connesso al server');
+            return;
+        }
+
+        if (!this.playerData) {
+            this.updateStatusMessage('Errore: dati giocatore non caricati');
+            return;
+        }
+
+        if (!this.playerId) {
+            this.updateStatusMessage('Errore: non registrato sul server. Attendi...');
+            // Riprova la registrazione
+            setTimeout(() => {
+                if (this.ws && this.playerData) {
+                    this.registerPlayer();
+                }
+            }, 1000);
+            return;
+        }
+
+        if (this.matchmakingStatus === 'idle') {
+            this.joinMatchmaking();
+        } else if (this.matchmakingStatus === 'searching') {
+            this.leaveMatchmaking();
+        }
+    }
+
+    joinMatchmaking() {
+        if (!this.playerId) {
+            console.error('❌ Tentativo di matchmaking senza essere registrati');
+            this.updateStatusMessage('Errore: non registrato sul server');
+            return;
+        }
+
+        const matchmakingData = {
+            type: 'joinMatchmaking',
+            level: this.playerData.livello || 1,
+            winRate: this.playerData.winRate || 0,
+            totalMatches: this.playerData.totalMatches || 0
+        };
+
+        console.log('📤 Invio richiesta matchmaking:', matchmakingData);
+        this.ws.send(JSON.stringify(matchmakingData));
+        this.updateStatusMessage('Entrando in coda...');
+    }
+
+    leaveMatchmaking() {
+        if (this.matchmakingStatus === 'searching') {
+            this.ws.send(JSON.stringify({ type: 'leaveMatchmaking' }));
+        }
+    }
+
+    updateMatchmakingUI() {
+        const btn = document.getElementById('matchmaking-btn');
+        
+        switch (this.matchmakingStatus) {
+            case 'idle':
+                btn.textContent = 'Cerca Partita';
+                btn.disabled = false;
+                break;
+            case 'searching':
+                btn.textContent = 'Annulla Ricerca';
+                btn.disabled = false;
+                break;
+            case 'found':
+                btn.textContent = 'Match Trovato!';
+                btn.disabled = true;
+                break;
+            case 'in_game':
+                btn.textContent = 'In Partita';
+                btn.disabled = true;
+                break;
+        }
+    }
+
+    updateStatusMessage(message) {
+        const statusElement = document.getElementById('status-message');
+        if (statusElement) {
+            statusElement.textContent = message;
+        }
+    }
+
+    updateConnectionStatus(status) {
+        // Aggiungi indicatore di connessione se non esiste
+        let indicator = document.getElementById('connection-status');
+        if (!indicator) {
+            indicator = document.createElement('div');
+            indicator.id = 'connection-status';
+            indicator.className = 'connection-indicator';
+            document.getElementById('arena-container').appendChild(indicator);
+        }
+        
+        indicator.textContent = `Stato: ${status}`;
+        indicator.className = `connection-indicator ${
+            status === 'Connesso' ? 'connected' : 'disconnected'
+        }`;
+    }
+
+    updateOnlineCount(count) {
+        const element = document.getElementById('online-players-count');
+        if (element) {
+            element.textContent = count;
+        }
+    }
+
+    setArenaTheme(mode) {
+        const theme = mode === 'night' ? 'night' : 'day';
+        document.body.classList.remove('day', 'night');
+        document.body.classList.add(theme);
+        localStorage.setItem('mode', theme);
+    }
+
+    initArenaTheme() {
+        const saved = localStorage.getItem('mode');
+        this.setArenaTheme(saved === 'night' ? 'night' : 'day');
     }
 }
 
-function updatePlayersList(players) {
-    const listElement = document.getElementById('players-list');
-    if (!listElement) return;
-    
-    listElement.innerHTML = '';
-    players.forEach(player => {
-        const playerItem = document.createElement('li');
-        playerItem.textContent = `${player.username} (Level ${player.level})`;
-        if (player.inGame) {
-            playerItem.textContent += ' - In Game';
-            playerItem.style.color = '#ff6b6b';
-        }
-        listElement.appendChild(playerItem);
-    });
-}
+// Inizializza l'arena manager quando la pagina è caricata
+window.addEventListener('DOMContentLoaded', () => {
+    new ArenaManager();
+});
 
-async function updatePlayerDisplay(playerData) {
-    if (playerData) {
-        const nameEl = document.getElementById('name-value');
-        const levelEl = document.getElementById('level-value');
-        
-        if (nameEl) nameEl.textContent = playerData.username;
-        if (levelEl) levelEl.textContent = playerData.livello || 1;
-        
-        // Aggiorna win rate se esiste
-        const winRateEl = document.getElementById('winrate-value');
-        if (winRateEl && playerData.partite > 0) {
-            const winRate = ((playerData.vittorie / playerData.partite) * 100).toFixed(1);
-            winRateEl.textContent = `${winRate}%`;
-        }
-    }
-}
-
+// Funzioni globali per retrocompatibilità
 function startTrainingMode() {
-    // Passa alla modalità training
     window.location.href = 'game.html?mode=training';
 }
 
-// Inizializzazione quando la pagina è caricata
-window.addEventListener('DOMContentLoaded', async () => {
-    initArenaTheme();
-    
-    // Connetti al server
-    connectToServer();
-    
-    const username = localStorage.getItem('currentPlayer');
-    if (username) {
-        const player = await getPlayerData(username);
-        updatePlayerDisplay(player);
-    }
-
-    // Setup pulsanti
-    const matchmakingBtn = document.getElementById('matchmaking-btn');
-    if (matchmakingBtn) {
-        matchmakingBtn.addEventListener('click', () => {
-            if (!isSearching && !currentMatch) {
-                startMatchmaking();
-                matchmakingBtn.textContent = 'Cancel Search';
-            } else if (isSearching) {
-                cancelMatchmaking();
-                matchmakingBtn.textContent = 'Search Match';
-            }
-        });
-    }
-
-    // Pulsante Home
-    const homeBtn = document.getElementById('home-btn');
-    if (homeBtn) {
-        homeBtn.addEventListener('click', () => {
-            window.location.href = 'home.html';
-        });
-    }
-
-    // Pulsante Training
-    const trainingBtn = document.getElementById('training-btn');
-    if (trainingBtn) {
-        trainingBtn.addEventListener('click', startTrainingMode);
-    }
-});
-
-// Gestione tema
-function setArenaTheme(mode) {
-    const theme = mode === 'night' ? 'night' : 'day';
-    document.body.classList.remove('day', 'night');
-    document.body.classList.add(theme);
-    localStorage.setItem('mode', theme);
-}
-
-function initArenaTheme() {
-    const saved = localStorage.getItem('mode');
-    setArenaTheme(saved === 'night' ? 'night' : 'day');
-}
-
-// Scorciatoie tastiera
-window.addEventListener("keydown", (e) => {
-    if (e.key === 'n' || e.key === 'N') setArenaTheme('night');
-    if (e.key === 'g' || e.key === 'G') setArenaTheme('day');
-});
-
-// Cleanup quando si chiude la pagina
-window.addEventListener('beforeunload', () => {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.close();
-    }
-});
+// Export per uso esterno se necessario
+export { ArenaManager };
