@@ -51,8 +51,8 @@ class ArenaManager {
             playerInfo.appendChild(stats);
         }
 
-        const totalMatches = this.playerData.totalMatches || 0;
-        const winRate = this.playerData.winRate || 0;
+        const totalMatches = this.playerData.partite || 0;
+        const winRate = this.playerData.vittorie/this.playerData.partite || 0;
         const totalWins = Math.floor(totalMatches * winRate);
 
         document.getElementById('total-matches').textContent = totalMatches;
@@ -154,8 +154,8 @@ class ArenaManager {
             type: 'register',
             username: this.playerData.username,
             level: this.playerData.livello || 1,
-            winRate: this.playerData.winRate || 0,
-            totalMatches: this.playerData.totalMatches || 0
+            winRate: this.playerData.vittorie/this.playerData.partite || 0,
+            totalMatches: this.playerData.partite || 0
         };
 
         console.log('📤 Invio registrazione:', registrationData);
@@ -282,8 +282,8 @@ class ArenaManager {
         const matchmakingData = {
             type: 'joinMatchmaking',
             level: this.playerData.livello || 1,
-            winRate: this.playerData.winRate || 0,
-            totalMatches: this.playerData.totalMatches || 0
+            winRate: this.playerData.vittorie/this.playerData.partite || 0,
+            totalMatches: this.playerData.partite || 0
         };
 
         console.log('📤 Invio richiesta matchmaking:', matchmakingData);

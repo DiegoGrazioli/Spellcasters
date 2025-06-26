@@ -6,6 +6,7 @@ import { loadPlayerFromDB, savePlayerData, getPlayerData } from "./player-db.js"
 import { CollisionSystem, VirtualMouseEntity, globalCollisionSystem } from "./collision-system.js";
 import { Spark } from "./sparks.js";
 import { PvPManager } from "./pvp-manager.js";
+import { triggerCameraShake, applyCameraShake, updateRedOverlay, drawRedOverlay } from './damage-effects.js';
 
 const recognizer = new DollarRecognizer();
 
@@ -49,8 +50,10 @@ let proiezioniToAdd = {};
 let lastAffinitySave = Date.now();
 let lastProiezioniSave = Date.now();
 
-let expToAdd = 0;
-let lastExpSave = Date.now();
+let spazialExpToAdd = 0;
+let proiettileExpToAdd = 0;
+let lastSpazialExpSave = Date.now();
+let lastProiettileExpSave = Date.now();
 
 let virtualMouse = { x: canvas.width / 2, y: canvas.height / 2 };
 let virtualMouseSpeed = 16; // pixel per frame
@@ -65,6 +68,8 @@ let collisionSparks = []; // Array globale per le scintille
 let pvpManager = null;
 let gameMode = 'training'; // 'training', 'pvp'
 let isInPvPMatch = false;
+
+let playerLife = 100;
 
 function initializeGameMode() {
     const params = new URLSearchParams(window.location.search);
@@ -535,11 +540,18 @@ function launchProjectile(start, end, colorOverride, tipoProiezione = "proiettil
   }
   
   incrementaProiezioneUsataBuffer("proiettile");
+  proiettileExpToAdd += 2;
+  console.log("🎯 Esperienza proiettile aggiunta:", 2);
 }
 
 function updateProjectiles() {
   for (let i = projectiles.length - 1; i >= 0; i--) {
     const p = projectiles[i];
+    if (p.hit) {
+      projectiles.splice(i, 1);
+      continue;
+    }
+
     p.x += p.vx;
     p.y += p.vy;
     p.life--;
@@ -854,7 +866,7 @@ function spendMana(amount) {
     return false;
   }
   setCurrentMana(getCurrentMana() - amount);
-  expToAdd += amount;
+  // expToAdd += amount;
   return true;
 }
 
@@ -896,6 +908,7 @@ function incrementaProiezioneUsataBuffer(tipo, valore = 1) {
 // === ANIMATE LOOP ===
 export function animate() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  applyCameraShake(ctx);
   updateVirtualMouse();
   globalCollisionSystem.update();
   updateCollisionSparks();
@@ -968,7 +981,8 @@ export function animate() {
     } else {
       setCurrentMana(currentMana - manaToDrain);
     }
-    expToAdd += manaToDrain;
+    spazialExpToAdd += manaToDrain;
+    console.log("🔮 Esperienza spaziale aggiunta:", manaToDrain);
   }
 
   const now = Date.now();
@@ -1000,15 +1014,45 @@ export function animate() {
     })();
     drawExpBar();
   }
-  if (now - lastExpSave > 1000 && expToAdd > 0) {
+   // Salvataggio esperienza spaziale
+  if (now - lastSpazialExpSave > 1000 && spazialExpToAdd > 0) {
+
+    const expToSave = spazialExpToAdd; // Salva il valore
+    spazialExpToAdd = 0; // Azzera IMMEDIATAMENTE
+    lastSpazialExpSave = now; // Aggiorna il timer IMMEDIATAMENTE
+
     (async () => {
-      await addPlayerExp(expToAdd);
-      expToAdd = 0;
-      lastExpSave = now;
+      console.log("🔮 Salvando esperienza spaziale:", spazialExpToAdd);
+      await addPlayerExp(expToSave);
+      spazialExpToAdd = 0;
+      lastSpazialExpSave = now;
+    })();
+  }
+  
+  // Salvataggio esperienza proiettile
+  if (now - lastProiettileExpSave > 1000 && proiettileExpToAdd > 0) {
+
+    const expToSave = proiettileExpToAdd; // Salva il valore
+    proiettileExpToAdd = 0; // Azzera IMMEDIATAMENTE
+    lastProiettileExpSave = now; // Aggiorna il timer IMMEDIATAMENTE
+
+    (async () => {
+      console.log("🎯 Salvando esperienza proiettile:", proiettileExpToAdd);
+      await addPlayerExp(expToSave);
+      proiettileExpToAdd = 0;
+      lastProiettileExpSave = now;
     })();
   }
 
   regenMana();
+  let health = 100;
+  if (pvpManager && pvpManager.isActive()) {
+    health = pvpManager.gameHooks.playerHealth;
+  } else {
+    health = typeof playerLife !== "undefined" ? playerLife : 100;
+  }
+  updateRedOverlay(health, 100);
+  drawRedOverlay(ctx, canvas);
   requestAnimationFrame(animate);
   circleRotation += 0.003;
   drawManaSegments();
@@ -1073,6 +1117,10 @@ function activateSpazialeArea(points, color) {
 
   // Salva l'area per la persistenza
   permanentSpazialeAreas.push({ points: points.map(p => ({...p})), color, manaDrain, affinityTimer: 0 });
+
+  const expForArea = Math.floor(area / 1000); // Esperienza basata sulla dimensione dell'area
+  spazialExpToAdd += expForArea;
+  console.log("🔮 Esperienza spaziale per creazione area:", expForArea);
 
   // Effetto visivo area spaziale (opzionale, per feedback immediato)
   ctx.save();

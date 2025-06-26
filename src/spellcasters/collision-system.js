@@ -169,12 +169,10 @@ export class CollisionSystem {
   }
 
   onCollision(otherEntity, collision, forceInfo) {
-    console.log(`Mouse collided with ${otherEntity.type || 'entity'}!`);
     
     if (forceInfo && !forceInfo.canMove) {
       const impact = (forceInfo.impactForce !== undefined) ? forceInfo.impactForce.toFixed(2) : 'n/a';
       const richiesta = ((otherEntity.mass || 1) * (otherEntity.resistance || 1)).toFixed(2);
-      console.log(`Il mouse non riesce a spostare ${otherEntity.type} (forza: ${impact}, richiesta: ${richiesta})`);
     }
     
     if (otherEntity.setState && typeof otherEntity.setState === 'function') {

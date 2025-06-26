@@ -468,8 +468,8 @@ function endMatch(matchId, reason, winner = null) {
 
     // Invia i risultati ai giocatori
     const matchResults = {
-        type: 'matchEnded',
-        reason: reason,
+        type: 'gameEnd', // <-- Cambia qui!
+        reason: reason === 'disconnect' ? 'forfeit' : reason,
         winner: winner,
         duration: match.duration,
         finalGameState: match.gameState

@@ -1,5 +1,6 @@
 // pvp-manager.js - Gestione partite PvP integrata con main.js
 import { VirtualMouseEntity, globalCollisionSystem } from "./collision-system.js";
+import { triggerCameraShake, updateRedOverlay } from './damage-effects.js';
 
 export class PvPManager {
     constructor(gameCanvas, gameContext) {
@@ -45,10 +46,18 @@ export class PvPManager {
         
         // Sistemi di sincronizzazione
         this.lastUpdateSent = 0;
-        this.updateInterval = 1000 / 30; // 30 FPS per sincronizzazione
+        this.updateInterval = 1000 / 60; // 60 FPS per sincronizzazione
         this.lastMagicCircleState = null;
         
+        this.processedHits = new Set(); // Traccia hit già processati
+
+        this.healthPersistenceKey = null;
+
+        this.intentionalDisconnect = false;
+
         this.initializePvP();
+
+        this.setupPageUnloadHandler();
     }
 
     async initializePvP() {
@@ -63,6 +72,9 @@ export class PvPManager {
         this.playerRole = this.matchData.playerRole;
         this.opponentData = this.matchData.opponent;
         this.gameState = this.matchData.gameState;
+
+        this.healthPersistenceKey = `match_health_${this.matchData.matchId}`;
+        this.loadHealthFromStorage();
         
         // Imposta posizioni iniziali
         if (this.playerRole === 'player1') {
@@ -93,6 +105,82 @@ export class PvPManager {
 
         console.log(`⚔️ Partita PvP inizializzata - Ruolo: ${this.playerRole}`);
         console.log(`🎯 Avversario: ${this.opponentData.username} (Liv. ${this.opponentData.level})`);
+    }
+
+    setupPageUnloadHandler() {
+        window.addEventListener('beforeunload', (event) => {
+            if (this.isActive() && this.isConnected) {
+                this.notifyPlayerDisconnect();
+                // NON chiamare qui cleanupMatch()!
+                window.location.href = 'arena.html';
+            }
+        });
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && this.isActive() && this.isConnected) {
+                this.notifyPlayerDisconnect();
+            }
+        });
+    }
+
+    notifyPlayerDisconnect() {
+        if (!this.isConnected || !this.ws) return;
+        this.intentionalDisconnect = true;
+        try {
+            const disconnectMessage = {
+                type: 'playerDisconnect',
+                matchId: this.matchData.matchId,
+                playerRole: this.playerRole,
+                reason: 'forfeit',
+                timestamp: Date.now()
+            };
+            this.ws.send(JSON.stringify(disconnectMessage));
+        } catch (error) {
+            console.error('❌ Errore invio disconnessione:', error);
+        }
+    }
+
+    loadHealthFromStorage() {
+        try {
+            const savedHealth = localStorage.getItem(this.healthPersistenceKey);
+            if (savedHealth) {
+                const healthData = JSON.parse(savedHealth);
+                
+                // Carica salute del player corrente
+                if (healthData[this.playerRole]) {
+                    this.gameHooks.playerHealth = healthData[this.playerRole];
+                    console.log(`💚 Salute caricata per ${this.playerRole}: ${this.gameHooks.playerHealth}`);
+                }
+                
+                // Carica salute dell'avversario
+                const opponentRole = this.playerRole === 'player1' ? 'player2' : 'player1';
+                if (healthData[opponentRole]) {
+                    this.opponent.health = healthData[opponentRole];
+                    console.log(`💚 Salute caricata per avversario: ${this.opponent.health}`);
+                }
+            } else {
+                console.log('💚 Nessuna salute salvata trovata, usando valori di default');
+            }
+        } catch (error) {
+            console.error('❌ Errore caricamento salute:', error);
+        }
+    }
+
+    saveHealthToStorage() {
+        try {
+            const currentHealth = this.getCurrentHealthData();
+            localStorage.setItem(this.healthPersistenceKey, JSON.stringify(currentHealth));
+            console.log('💾 Salute salvata:', currentHealth);
+        } catch (error) {
+            console.error('❌ Errore salvataggio salute:', error);
+        }
+    }
+
+    getCurrentHealthData() {
+        const opponentRole = this.playerRole === 'player1' ? 'player2' : 'player1';
+        return {
+            [this.playerRole]: this.gameHooks.playerHealth,
+            [opponentRole]: this.opponent.health
+        };
     }
 
     connectToGameServer() {
@@ -132,7 +220,6 @@ export class PvPManager {
             };
 
             this.ws.onmessage = (event) => {
-                console.log('📨 Messaggio WebSocket ricevuto (raw):', event.data);
                 try {
                     const data = JSON.parse(event.data);
                     this.handleGameMessage(data);
@@ -149,10 +236,13 @@ export class PvPManager {
             this.ws.onclose = () => {
                 console.log('🔌 Connessione chiusa');
                 this.isConnected = false;
-                // Tenta riconnessione ogni 3 secondi
-                setTimeout(() => {
-                    if (!this.isConnected) this.connectToGameServer();
-                }, 3000);
+                if (!this.intentionalDisconnect) {
+                    setTimeout(() => {
+                        if (!this.isConnected && !this.intentionalDisconnect) {
+                            this.connectToGameServer();
+                        }
+                    }, 3000);
+                }
             };
             
         } catch (error) {
@@ -161,7 +251,6 @@ export class PvPManager {
     }
 
     handleGameMessage(data) {
-        console.log(`🔄 Messaggio ricevuto dal server: ${data.type}`, data);
 
 
         switch (data.type) {
@@ -189,10 +278,52 @@ export class PvPManager {
             case 'gameEnd':
                 this.handleGameEnd(data);
                 break;
+            case 'playerDisconnect':
+                this.handlePlayerDisconnect(data);
+                break;
             case 'error':
                 console.error('❌ Errore server:', data.message);
                 break;
         }
+    }
+
+    handlePlayerDisconnect(data) {
+        console.log('🚪 Avversario disconnesso:', data.reason);
+        
+        // Il giocatore corrente vince automaticamente
+        this.showDisconnectionMessage();
+        this.endMatch(true, 'opponent_disconnect');
+    }
+
+    showDisconnectionMessage() {
+        // Mostra messaggio di vittoria per disconnessione avversario
+        const message = "L'avversario si è disconnesso. Hai vinto! 🎉";
+        
+        // Crea overlay per il messaggio
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+            z-index: 10000;
+            text-align: center;
+        `;
+        overlay.textContent = message;
+        document.body.appendChild(overlay);
+        
+        // Rimuovi overlay dopo 3 secondi
+        setTimeout(() => {
+            overlay.remove();
+        }, 3000);
     }
 
     handleGameUpdate(data) {
@@ -202,7 +333,6 @@ export class PvPManager {
     }
 
     handleOpponentMove(data) {
-        console.log(`📥 Movimento avversario ricevuto: ${JSON.stringify(data.virtualMouse)}`);
         
         const prevPosition = { ...this.opponent.virtualMouse };
         
@@ -220,7 +350,6 @@ export class PvPManager {
             this.opponentEntity.velocity.x = dx * 2; // Amplifica per effetti più visibili
             this.opponentEntity.velocity.y = dy * 2;
             
-            console.log(`🏃 Velocità avversario: vx=${dx.toFixed(2)}, vy=${dy.toFixed(2)}`);
         }
         
         // Aggiorna hitbox avversario
@@ -255,7 +384,6 @@ export class PvPManager {
             this.gameHooks.projectiles.push(projectile);
         }
         
-        console.log(`🎯 Proiettile nemico ricevuto: ${data.tipo}`);
     }
 
     handleOpponentMagicCircle(data) {
@@ -271,9 +399,32 @@ export class PvPManager {
     }
 
     handleProjectileHit(data) {
+        const hitId = `${data.projectileId || 'unknown'}_${data.timestamp}`;
+        if (this.processedHits.has(hitId)) {
+            console.log(`🔄 [SKIP] Hit già processato: ${hitId}`);
+            return;
+        }
+        
+        // Marca questo hit come processato
+        this.processedHits.add(hitId);
+        
+        // Pulisci hits vecchi (mantieni solo gli ultimi 100)
+        if (this.processedHits.size > 100) {
+            const oldHits = Array.from(this.processedHits).slice(0, -50);
+            oldHits.forEach(id => this.processedHits.delete(id));
+        }
+
         if (data.target === this.playerRole) {
-            // Il giocatore locale è stato colpito
+            const healthBefore = this.gameHooks.playerHealth;
             this.gameHooks.playerHealth -= data.damage;
+            const healthAfter = this.gameHooks.playerHealth;
+
+            console.log(`💥 [SERVER] Player colpito! ID: ${data.projectileId} | Danno: ${data.damage} | Vita: ${healthBefore} → ${healthAfter}`);
+
+            // Salva salute aggiornata
+            this.saveHealthToStorage();
+
+            // Il giocatore locale è stato colpito
             this.showDamageEffect(data.damage, true);
             
             if (this.gameHooks.playerHealth <= 0) {
@@ -283,6 +434,9 @@ export class PvPManager {
             // L'avversario è stato colpito
             this.opponent.health -= data.damage;
             this.showDamageEffect(data.damage, false);
+            
+            // Salva salute aggiornata
+            this.saveHealthToStorage();
             
             if (this.opponent.health <= 0) {
                 this.endMatch(true);
@@ -344,7 +498,6 @@ export class PvPManager {
         };
 
         this.ws.send(JSON.stringify(updateData));
-        console.log(`📤 Movimento inviato al server: ${JSON.stringify(updateData.virtualMouse)}`);
     }
 
     syncMagicCircle(magicCircle) {
@@ -455,20 +608,55 @@ export class PvPManager {
         for (let i = projectiles.length - 1; i >= 0; i--) {
             const projectile = projectiles[i];
             
+            if (projectile.hit) continue;
+
             // Solo proiettili nemici possono danneggiare il giocatore locale
             if (projectile.owner === 'opponent') {
                 if (this.isProjectileHittingPlayer(projectile, this.gameHooks.virtualMouse)) {
                     const damage = this.calculateDamage(projectile);
-                    this.handleLocalPlayerHit(projectile, damage);
-                    projectiles.splice(i, 1); // Rimuovi proiettile
+                    
+                    console.log(`🎯 [DETECTION] Proiettile nemico colpisce il player. Danno: ${damage}`);
+                    
+                    projectile.hit = true;
+
+                    // Applica danno e effetti localmente (per feedback immediato)
+                    const healthBefore = this.gameHooks.playerHealth;
+                    // this.gameHooks.playerHealth -= damage;
+                    const healthAfter = this.gameHooks.playerHealth;
+                    
+                    console.log(`💥 [LOCAL] Player colpito! Danno: ${damage} | Vita: ${healthBefore} → ${healthAfter}`);
+                    
+                    this.showDamageEffect(damage, true);
+                    triggerCameraShake(10, 250);
+                    updateRedOverlay(this.gameHooks.playerHealth, 100);
+                    
+                    if (this.gameHooks.playerHealth <= 0) {
+                        console.log("💀 [LOCAL] PLAYER MORTO!");
+                        this.endMatch(false);
+                    }
+                    
+                    // projectiles.splice(i, 1); // Rimuovi proiettile
                 }
             }
             // Solo proiettili locali possono danneggiare l'avversario
             else if (projectile.owner === 'local') {
                 if (this.isProjectileHittingPlayer(projectile, this.opponent.position)) {
                     const damage = this.calculateDamage(projectile);
-                    this.handleOpponentHit(projectile, damage);
-                    projectiles.splice(i, 1); // Rimuovi proiettile
+                    // this.handleOpponentHit(projectile, damage);
+                    // projectiles.splice(i, 1); // Rimuovi proiettile
+
+                    projectile.hit = true;
+
+                    if (this.isConnected) {
+                        this.ws.send(JSON.stringify({
+                            type: 'projectileHit',
+                            matchId: this.matchData.matchId,
+                            target: this.playerRole === 'player1' ? 'player2' : 'player1',
+                            damage: damage,
+                            element: projectile.element,
+                            timestamp: Date.now()
+                        }));
+                    }
                 }
             }
         }
@@ -483,7 +671,7 @@ export class PvPManager {
     }
 
     calculateDamage(projectile) {
-        let baseDamage = 10;
+        let baseDamage = 1;
         
         // Modifica danno in base al tipo di proiezione
         switch (projectile.tipo) {
@@ -491,7 +679,7 @@ export class PvPManager {
                 baseDamage = 15;
                 break;
             case 'spaziale':
-                baseDamage = 20;
+                baseDamage = 2;
                 break;
             default:
                 baseDamage = 10;
@@ -519,21 +707,15 @@ export class PvPManager {
     }
 
     handleLocalPlayerHit(projectile, damage) {
-        this.gameHooks.playerHealth -= damage;
+        const healthBefore = this.gameHooks.playerHealth;
+        // this.gameHooks.playerHealth -= damage;
         this.showDamageEffect(damage, true);
+        const healthAfter = this.gameHooks.playerHealth;
         
-        // Invia conferma hit al server
-        if (this.isConnected) {
-            this.ws.send(JSON.stringify({
-                type: 'projectileHit',
-                matchId: this.matchData.matchId,
-                target: this.playerRole,
-                damage: damage,
-                element: projectile.element,
-                timestamp: Date.now()
-            }));
-        }
-        
+        console.log(`💥 [PLAYER] Colpito! Danno: ${damage} | Vita: ${healthBefore} → ${healthAfter}`);
+
+        triggerCameraShake(10, 250);
+        updateRedOverlay(this.gameHooks.playerHealth, 100);
         console.log(`💥 Colpito! Danno: ${damage}, Salute rimanente: ${this.gameHooks.playerHealth}`);
         
         if (this.gameHooks.playerHealth <= 0) {
@@ -542,7 +724,7 @@ export class PvPManager {
     }
 
     handleOpponentHit(projectile, damage) {
-        this.opponent.health -= damage;
+        // this.opponent.health -= damage;
         this.showDamageEffect(damage, false);
         
         // Invia hit al server
@@ -588,7 +770,6 @@ export class PvPManager {
 
     drawOpponent(ctx) {
         const pos = this.opponent.virtualMouse; // Usa virtualMouse invece di position
-        console.log(`🎨 Disegno avversario a: x=${pos.x}, y=${pos.y}`);
         // Disegna virtual mouse dell'avversario IDENTICO al player ma rosso
         ctx.save();
         ctx.beginPath();
@@ -685,20 +866,39 @@ export class PvPManager {
         console.log(`${isLocalPlayer ? '💥' : '🎯'} Danno: ${damage}`);
     }
 
-    async endMatch(won) {
-        console.log(won ? '🎉 Hai vinto!' : '💀 Hai perso!');
-        
-        // Mostra risultato
-        alert(won ? 'Vittoria! 🎉' : 'Sconfitta! 💀');
-        
-        // Aggiorna statistiche
+    async endMatch(won, reason = 'normal') {
+        let message;
+        if (reason === 'forfeit') {
+            message = won ? 'Hai vinto per forfeit dell\'avversario!' : 'Hai perso per forfeit!';
+        } else if (reason === 'opponent_disconnect') {
+            message = 'Vittoria per disconnessione avversario! 🎉';
+        } else {
+            message = won ? 'Vittoria! 🎉' : 'Sconfitta! 💀';
+        }
+        alert(message);
         await this.updatePlayerStats(won);
-        
-        // Torna al menu arena
+        this.cleanupMatch();
         setTimeout(() => {
-            localStorage.removeItem('currentMatchData');
             window.location.href = 'arena.html';
         }, 2000);
+    }
+
+    cleanupMatch() {
+        // Rimuovi dati della partita
+        localStorage.removeItem('currentMatchData');
+        
+        // Rimuovi dati di salute della partita
+        if (this.healthPersistenceKey) {
+            localStorage.removeItem(this.healthPersistenceKey);
+            console.log('🗑️ Dati partita puliti');
+        }
+        
+        // Marca come disconnessione volontaria e disconnetti WebSocket
+        this.intentionalDisconnect = true;
+        if (this.ws) {
+            this.ws.close();
+            this.isConnected = false;
+        }
     }
 
     async updatePlayerStats(won) {
