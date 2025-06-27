@@ -2,6 +2,7 @@
 import { VirtualMouseEntity, globalCollisionSystem } from "./collision-system.js";
 import { triggerCameraShake, updateRedOverlay } from './damage-effects.js';
 import { drawProjectilePolygonPattern } from "./element-patterns.js";
+import { applyElementalHit, statusEffectManager, updateStatusEffects, createElementalDebuffParticles } from './status-effects.js';
 
 export class PvPManager {
     constructor(gameCanvas, gameContext) {
@@ -60,9 +61,82 @@ export class PvPManager {
 
         this.opponentCircleRotation = 0;
 
+        // status effects
+        this.playerMovementModifier = { speedMultiplier: 1 };
+        this.playerControlInverted = false;
+        this.playerStunned = false;
+        this.opponentMovementModifier = { speedMultiplier: 1 };
+        this.opponentControlInverted = false;
+        this.opponentStunned = false;
+
+        this.setupStatusEffectCallbacks();
+
         this.initializePvP();
 
         this.setupPageUnloadHandler();
+    }
+
+    setupStatusEffectCallbacks() {
+        // Callback per il giocatore locale
+        statusEffectManager.registerDamageCallback('player', (damage, source) => {
+            console.log(`💥 Player riceve ${damage} danno da ${source}`);
+            this.gameHooks.playerHealth -= damage;
+            this.showDamageEffect(damage, true);
+            triggerCameraShake(5, 150);
+
+            if (this.gameHooks.playerHealth <= 0) {
+                this.endMatch(false);
+            }
+        });
+
+        statusEffectManager.registerVisualCallback('player', (effectType, element) => {
+            if (effectType === 'burning') {
+                this.showStatusEffect(effectType, true);
+            } else if (effectType === 'debuff_particles') {
+                this.createDebuffParticles(element, this.gameHooks.virtualMouse);
+            } else {
+                this.showStatusEffect(effectType, true);
+            }
+        });
+
+        statusEffectManager.registerMovementCallback('player', (modifier) => {
+            this.playerMovementModifier = modifier;
+        });
+
+        statusEffectManager.registerControlCallback('player', (inverted) => {
+            this.playerControlInverted = inverted;
+        });
+
+        statusEffectManager.registerStunCallback('player', (stunned) => {
+            this.playerStunned = stunned;
+        });
+
+        // Callback per l'avversario
+        statusEffectManager.registerDamageCallback('opponent', (damage, source) => {
+            console.log(`💥 Opponent riceve ${damage} danno da ${source}`);
+            this.opponent.health -= damage;
+            this.showDamageEffect(damage, false);
+
+            if (this.opponent.health <= 0) {
+                this.endMatch(true);
+            }
+        });
+
+        statusEffectManager.registerMovementCallback('opponent', (modifier) => {
+            this.opponentMovementModifier = modifier;
+        });
+
+        statusEffectManager.registerControlCallback('opponent', (inverted) => {
+            this.opponentControlInverted = inverted;
+        });
+
+        statusEffectManager.registerStunCallback('opponent', (stunned) => {
+            this.opponentStunned = stunned;
+        });
+
+        statusEffectManager.registerVisualCallback('opponent', (effectType) => {
+            this.showStatusEffect(effectType, false);
+        });
     }
 
     async initializePvP() {
@@ -295,6 +369,37 @@ export class PvPManager {
         }
     }
 
+    showStatusEffect(effectType, isPlayer) {
+        const position = isPlayer ? this.gameHooks.virtualMouse : this.opponent.position;
+
+        // Crea particelle in base al tipo di effetto
+        switch (effectType) {
+            case 'burning':
+                this.createBurningParticles(position);
+                break;
+            // Altri effetti...
+        }
+    }
+
+    createBurningParticles(position) {
+        // Crea particelle di fuoco attorno al giocatore colpito
+        for (let i = 0; i < 15; i++) {
+            this.gameHooks.activeMagicParticles?.push({
+                x: position.x + (Math.random() - 0.5) * 30,
+                y: position.y + (Math.random() - 0.5) * 30,
+                radius: Math.random() * 3 + 1,
+                alpha: 0.8,
+                dx: (Math.random() - 0.5) * 2,
+                dy: Math.random() * -2 - 1,
+                color: `rgba(255, ${50 + Math.random() * 50}, 0, `,
+            });
+        }
+    }
+
+    createDebuffParticles(element, position) {
+        createElementalDebuffParticles(element, position, this.gameHooks.activeMagicParticles);
+    }
+
     handleOpponentSpellRemoval(data) {
         console.log('[DEBUG] handleOpponentSpellRemoval chiamato:', data);
         
@@ -484,10 +589,10 @@ export class PvPManager {
             console.log(`🔄 [SKIP] Hit già processato: ${hitId}`);
             return;
         }
-        
+
         // Marca questo hit come processato
         this.processedHits.add(hitId);
-        
+
         // Pulisci hits vecchi (mantieni solo gli ultimi 100)
         if (this.processedHits.size > 100) {
             const oldHits = Array.from(this.processedHits).slice(0, -50);
@@ -499,25 +604,39 @@ export class PvPManager {
             this.gameHooks.playerHealth -= data.damage;
             const healthAfter = this.gameHooks.playerHealth;
 
-            console.log(`💥 [SERVER] Player colpito! ID: ${data.projectileId} | Danno: ${data.damage} | Vita: ${healthBefore} → ${healthAfter}`);
+            console.log(`💥 [SERVER] Player colpito! ID: ${data.projectileId} | Danno: ${data.damage} | Vita: ${healthBefore} → ${healthAfter} | Elemento: ${data.element || 'nessuno'}`);
 
             // Salva salute aggiornata
             this.saveHealthToStorage();
 
             // Il giocatore locale è stato colpito
             this.showDamageEffect(data.damage, true);
-            
+
+            // ⭐ NUOVO: Applica effetto elementale se presente
+            if (data.element) {
+                console.log(`✨ Applicando effetto elementale ${data.element} al player`);
+                applyElementalHit(data.element, 'player');
+            }
+
             if (this.gameHooks.playerHealth <= 0) {
                 this.endMatch(false);
             }
         } else {
             // L'avversario è stato colpito
+            const healthBefore = this.opponent.health;
             this.opponent.health -= data.damage;
+            const healthAfter = this.opponent.health;
+
+            console.log(`💥 [SERVER] Opponent colpito! Danno: ${data.damage} | Vita: ${healthBefore} → ${healthAfter} | Elemento: ${data.element || 'nessuno'}`);
+
             this.showDamageEffect(data.damage, false);
-            
-            // Salva salute aggiornata
-            this.saveHealthToStorage();
-            
+
+            // ⭐ NUOVO: Applica effetto elementale se presente
+            if (data.element) {
+                console.log(`✨ Applicando effetto elementale ${data.element} all'opponent`);
+                applyElementalHit(data.element, 'opponent');
+            }
+
             if (this.opponent.health <= 0) {
                 this.endMatch(true);
             }
@@ -557,6 +676,8 @@ export class PvPManager {
      */
     syncWithMainGame(gameState) {
         const now = Date.now();
+
+        updateStatusEffects(1 / 60);
 
         this.opponentCircleRotation += 0.003;
         
@@ -761,7 +882,7 @@ export class PvPManager {
                             matchId: this.matchData.matchId,
                             target: this.playerRole === 'player1' ? 'player2' : 'player1',
                             damage: damage,
-                            element: projectile.element,
+                            element: projectile.element, // ⭐ IMPORTANTE: Questo invia l'elemento
                             timestamp: Date.now()
                         }));
                     }
@@ -797,10 +918,10 @@ export class PvPManager {
         if (projectile.element) {
             switch (projectile.element) {
                 case 'fuoco':
-                    baseDamage *= 1.3;
+                    baseDamage *= 1.1;
                     break;
                 case 'acqua':
-                    baseDamage *= 1.1;
+                    baseDamage *= 1.2;
                     break;
                 case 'aria':
                     baseDamage *= 1.2;
@@ -842,7 +963,7 @@ export class PvPManager {
                 matchId: this.matchData.matchId,
                 target: this.playerRole === 'player1' ? 'player2' : 'player1',
                 damage: damage,
-                element: projectile.element,
+                element: projectile.element, // ⭐ IMPORTANTE: Questo invia l'elemento
                 timestamp: Date.now()
             }));
         }
@@ -1251,7 +1372,7 @@ export class PvPManager {
             // Cerchio alle estremità interne delle linee radiali
             ctx.beginPath();
             ctx.arc(0, 0, r * 0.3, 0, 2 * Math.PI);
-            ctx.strokeStyle = '#aaf';
+            ctx.strokeStyle = opponentColor;
             ctx.lineWidth = 3;
             ctx.globalAlpha = 1;
             ctx.stroke();
@@ -1259,7 +1380,7 @@ export class PvPManager {
             // Cerchio alle estremità esterne delle linee radiali
             ctx.beginPath();
             ctx.arc(0, 0, r * 0.81, 0, 2 * Math.PI);
-            ctx.strokeStyle = '#aaf';
+            ctx.strokeStyle = opponentColor;
             ctx.lineWidth = 3;
             ctx.globalAlpha = 1;
             ctx.stroke();
@@ -1270,7 +1391,7 @@ export class PvPManager {
                 ctx.beginPath();
                 ctx.moveTo(Math.cos(angle) * r * 0.3, Math.sin(angle) * r * 0.3);
                 ctx.lineTo(Math.cos(angle) * r * 0.84, Math.sin(angle) * r * 0.84);
-                ctx.strokeStyle = '#aaf';
+                ctx.strokeStyle = opponentColor;
                 ctx.globalAlpha = 0.4;
                 ctx.lineWidth = 1;
                 ctx.stroke();
@@ -1298,7 +1419,7 @@ export class PvPManager {
             // Cerchio esterno aggiuntivo
             ctx.beginPath();
             ctx.arc(0, 0, r * 0.97, 0, 2 * Math.PI);
-            ctx.strokeStyle = '#aaf';
+            ctx.strokeStyle = opponentColor;
             ctx.lineWidth = 3;
             ctx.globalAlpha = 1;
             ctx.stroke();
@@ -1314,9 +1435,9 @@ export class PvPManager {
                     ctx.lineWidth = 3;
                     ctx.globalAlpha = 1;
                 } else {
-                    ctx.strokeStyle = 'rgba(0,180,255,0.5)';
+                    ctx.strokeStyle = opponentColor;
                     ctx.lineWidth = 2;
-                    ctx.globalAlpha = 1;
+                    ctx.globalAlpha = 0.5;
                 }
                 ctx.stroke();
                 ctx.globalAlpha = 1;
@@ -1348,7 +1469,7 @@ export class PvPManager {
                 ctx.rotate(angle);
                 ctx.beginPath();
                 ctx.ellipse(rad, 0, 6, 3, angle, 0, 2 * Math.PI);
-                ctx.fillStyle = 'rgba(0,200,255,0.5)';
+                ctx.fillStyle = opponentColor + '80';
                 ctx.fill();
                 ctx.restore();
             }
@@ -1422,7 +1543,7 @@ export class PvPManager {
                 ctx.beginPath();
                 ctx.moveTo(0, 0);
                 ctx.lineTo(Math.cos(angle) * r * 0.85, Math.sin(angle) * r * 0.85);
-                ctx.strokeStyle = '#4a3';
+                ctx.strokeStyle = opponentColor;
                 ctx.lineWidth = 1;
                 ctx.globalAlpha = 0.4;
                 ctx.stroke();
@@ -1450,9 +1571,9 @@ export class PvPManager {
 
                 // Zigzag
                 for (let j = 1; j <= 8; j++) {
-                    let zigX = r * (0.2 + j * 0.08);
-                    let zigY = (j % 2 === 0 ? 1 : -1) * r * 0.05;
-                    ctx.lineTo(zigX, zigY);
+                    let dist = r * (0.2 + j * 0.08);
+                    let offset = (j % 2 === 0) ? r * 0.03 : -r * 0.03;
+                    ctx.lineTo(dist, offset);
                 }
 
                 ctx.strokeStyle = opponentColor;

@@ -7,6 +7,7 @@ import { CollisionSystem, VirtualMouseEntity, globalCollisionSystem } from "./co
 import { Spark } from "./sparks.js";
 import { PvPManager } from "./pvp-manager.js";
 import { triggerCameraShake, applyCameraShake, updateRedOverlay, drawRedOverlay } from './damage-effects.js';
+import { statusEffectManager, applyElementalHit, updateStatusEffects } from "./status-effects.js";
 
 const recognizer = new DollarRecognizer();
 
@@ -123,8 +124,18 @@ canvas.addEventListener("click", () => {
 
 canvas.addEventListener("mousemove", (e) => {
   if (document.pointerLockElement === canvas) {
-    mouseTarget.x += e.movementX;
-    mouseTarget.y += e.movementY;
+    let movementX = e.movementX;
+    let movementY = e.movementY;
+
+    // 🌪️ INVERSIONE CONTROLLI - Se i controlli sono invertiti, inverti dx e dy
+    if (pvpManager && pvpManager.playerControlInverted) {
+      movementX = -movementX;
+      movementY = -movementY;
+    }
+
+    mouseTarget.x += movementX;
+    mouseTarget.y += movementY;
+
     // Limita ai bordi del canvas se vuoi
     mouseTarget.x = Math.max(0, Math.min(canvas.width, mouseTarget.x));
     mouseTarget.y = Math.max(0, Math.min(canvas.height, mouseTarget.y));
@@ -195,6 +206,32 @@ window.addEventListener("keydown", (e) => {
   }
   if (e.key === 'n' || e.key === 'N') setTheme('night');
   if (e.key === 'g' || e.key === 'G') setTheme('day');
+
+  // 🧪 TEST STATUS EFFECTS
+  if (e.key === '1') {
+    console.log("🔥 Testando effetto FUOCO");
+    if (typeof applyElementalHit !== 'undefined') {
+      applyElementalHit('fuoco', 'player');
+    }
+  }
+  if (e.key === '2') {
+    console.log("💧 Testando effetto ACQUA (rallentamento)");
+    if (typeof applyElementalHit !== 'undefined') {
+      applyElementalHit('acqua', 'player');
+    }
+  }
+  if (e.key === '3') {
+    console.log("💨 Testando effetto ARIA (inversione controlli)");
+    if (typeof applyElementalHit !== 'undefined') {
+      applyElementalHit('aria', 'player');
+    }
+  }
+  if (e.key === '4') {
+    console.log("🗿 Testando effetto TERRA (stun)");
+    if (typeof applyElementalHit !== 'undefined') {
+      applyElementalHit('terra', 'player');
+    }
+  }
 });
 
 window.addEventListener("keyup", (e) => {
@@ -1338,14 +1375,27 @@ function getElementFromColor(color) {
 }
 
 function updateVirtualMouse() {
+  // 🚫 CONTROLLO STUN - Se il giocatore è stunnato, non può muoversi
+  if (pvpManager && pvpManager.playerStunned) {
+    // Durante lo stun, il mouse virtuale non si muove verso il target
+    return;
+  }
+
   // Calcola la distanza tra mouse reale (mouseTarget) e virtuale
-  const dx = mouseTarget.x - virtualMouse.x;
-  const dy = mouseTarget.y - virtualMouse.y;
+  let dx = mouseTarget.x - virtualMouse.x;
+  let dy = mouseTarget.y - virtualMouse.y;
+
   const dist = Math.hypot(dx, dy);
 
   // Fattore di velocità: più è grande la distanza, più il virtuale si muove velocemente
-  const maxSpeed = 40; // velocità massima per frame
-  const speed = Math.min(dist * 0.25, maxSpeed); // 0.25 è il fattore di proporzionalità
+  let maxSpeed = 40; // ⭐ CAMBIA DA const A let
+
+  // 💧 RALLENTAMENTO - Applica modificatore di velocità
+  if (pvpManager && pvpManager.playerMovementModifier) {
+    maxSpeed *= pvpManager.playerMovementModifier.speedMultiplier;
+  }
+
+  const speed = Math.min(dist * 0.25, maxSpeed);
 
   if (dist > 0.5) { // evita jitter quando è molto vicino
     virtualMouse.x += (dx / dist) * speed;
@@ -1362,7 +1412,7 @@ function updateVirtualMouse() {
   // Sincronizza l'entità di collisione con il mouse virtuale
   virtualMouseEntity.x = virtualMouse.x;
   virtualMouseEntity.y = virtualMouse.y;
-  
+
   // Calcola la velocità per le collisioni basata sul movimento
   const velocityX = (dx / dist) * speed;
   const velocityY = (dy / dist) * speed;
@@ -1450,4 +1500,5 @@ function drawCollisionSparks(ctx) {
 }
 
 initializeGameMode();
+updateStatusEffects(1 / 60);
 animate();

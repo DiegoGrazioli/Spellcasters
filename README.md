@@ -85,6 +85,13 @@ Più si utilizza la magia, più aumenta l’esperienza. L’esperienza permette 
 
 Se si ignora il mana rimanente e lo si oltrepassa, si va in **burnout** (o overload) (le magie attive si annullano e non si possono utilizzare magie per 5 secondi)
 
+### Effetti degli elementi sugli avversari:
+se un proiettile infuso di un elemeno colpisce un avversario, questo avversario subisce le conseguenze del colpo in base all'elemento:
+- fuoco: l'avversario "brucia" (subisce 1 di danno ogni 0.5 secondi per 1.5 secondi)
+- acqua: l'avversario è rallentato del 20% per 1.5 secondi
+- aria: i comandi dell'avversario (assi x e y) sono invertiti per 1.5 secondi
+- terra: l'avversario non può muoversi per 0.5 secondi ogni 0.5 secondi per 2 volte
+
 ### Consumo di mana:
 - Elementi: 1 mana
 - Proiezioni (non permanenti): 2 mana
