@@ -69,8 +69,54 @@ function handleMessage(ws, data) {
         case 'projectileHit':
             handleProjectileHit(ws, data);
             break;
+        case 'spellCast':
+            handleSpellCast(ws, data);
+            break;
+        case 'spellRemoval':
+            handleSpellRemoval(ws, data);
+            break;
         default:
             console.log('🤔 Tipo messaggio sconosciuto:', data.type);
+    }
+}
+
+function handleSpellRemoval(ws, data) {
+    const player = connectedPlayers.get(ws);
+    if (!player || player.status !== 'in_game') return;
+    const match = activeMatches.get(player.currentMatch);
+    if (!match) return;
+    const isPlayer1 = match.players[0].id === player.id;
+    const opponent = match.players[isPlayer1 ? 1 : 0];
+    if (opponent && opponent.ws && opponent.ws.readyState === 1) {
+        opponent.ws.send(JSON.stringify({
+            type: 'opponentSpellRemoval',
+            spellType: data.spellType,
+            position: data.position,
+            polygonPoints: data.polygonPoints,
+            areaId: data.areaId, // Invia l'ID dell'area se disponibile
+            timestamp: data.timestamp || Date.now()
+        }));
+        console.log(`🛑 Rimozione spell inviata a ${opponent.username}: ${data.spellType}`);
+    }
+}
+
+function handleSpellCast(ws, data) {
+    const player = connectedPlayers.get(ws);
+    if (!player || player.status !== 'in_game') return;
+    const match = activeMatches.get(player.currentMatch);
+    if (!match) return;
+    const isPlayer1 = match.players[0].id === player.id;
+    const opponent = match.players[isPlayer1 ? 1 : 0];
+    if (opponent && opponent.ws && opponent.ws.readyState === 1) {
+        opponent.ws.send(JSON.stringify({
+            type: 'opponentSpell',
+            spellType: data.spellType,
+            position: data.position,
+            polygonPoints: data.polygonPoints, // CAMBIA DA radius a polygonPoints
+            element: data.element,
+            areaId: data.areaId, // Invia l'ID dell'area se disponibile
+            timestamp: data.timestamp || Date.now()
+        }));
     }
 }
 
@@ -94,7 +140,7 @@ function handlePlayerMove(ws, data) {
         match.gameState[playerKey].virtualMouse = data.virtualMouse;
     }
 
-    console.log(`🚶 ${player.username} si muove: ${JSON.stringify(data.virtualMouse)}`);
+    // console.log(`🚶 ${player.username} si muove: ${JSON.stringify(data.virtualMouse)}`);
 
     // Invia aggiornamento all'avversario
     if (opponent && opponent.ws && opponent.ws.readyState === 1) {
@@ -107,7 +153,7 @@ function handlePlayerMove(ws, data) {
         };
         
         opponent.ws.send(JSON.stringify(moveUpdate));
-        console.log(`📤 Movimento inviato a ${opponent.username}: ${JSON.stringify(data.virtualMouse)}`);
+        // console.log(`📤 Movimento inviato a ${opponent.username}: ${JSON.stringify(data.virtualMouse)}`);
     } else {
         console.log('❌ Avversario non disponibile per ricevere movimento');
     }
@@ -138,7 +184,7 @@ function handleProjectileLaunch(ws, data) {
             maxLife: data.maxLife,
             timestamp: data.timestamp || Date.now()
         }));
-        console.log(`📤 Proiettile inviato a ${opponent.username}`);
+        // console.log(`📤 Proiettile inviato a ${opponent.username}`);
     }
 }
 

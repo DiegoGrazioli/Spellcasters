@@ -94,8 +94,8 @@ class ArenaManager {
     }
 
     connectToServer() {
-        const wsUrl = 'wss://spellcasters.onrender.com'; // O localhost per development
-        // const wsUrl = 'ws://localhost:8080'; // Cambia con il tuo server WebSocket
+        // const wsUrl = 'wss://spellcasters.onrender.com'; // O localhost per development
+        const wsUrl = 'ws://localhost:8080'; // Cambia con il tuo server WebSocket
         
         try {
             this.ws = new WebSocket(wsUrl);

@@ -31,7 +31,7 @@ let magicCircle = null;
 let circleRotation = 0;
 let infusedElement = null;
 let infusedProjection = null;
-let magicCircleToDelete = false;
+// let magicCircleToDelete = false;
 
 let isActivatingMagicCircle = false;
 let magicCircleDragStart = null;
@@ -163,7 +163,13 @@ canvas.addEventListener("mouseup", (e) => {
     activateSpazialeArea(spazialePolygonPoints, spazialePolygonColor);
     incrementaProiezioneUsataBuffer("spaziale");
     showDebugMessage(`Area SPAZIALE creata! Cariche rimanenti: ${magicCircle.projections.length}`);
-    if (magicCircle.projections.length <= 0) magicCircleToDelete = true;
+    if (magicCircle.projections.length <= 0) {
+      // Esaurimento cariche durante creazione area spaziale - il cerchio scompare ma le aree persistono
+      magicCircle = null;
+      infusedElement = null;
+      infusedProjection = null;
+      showDebugMessage("Cerchio magico esaurito dopo creazione area - aree spaziali persistono");
+    }
     isDrawingSpaziale = false;
     spazialePolygonPoints = [];
     return;
@@ -208,7 +214,21 @@ function simulateRightClick() {
   // Cancella area spaziale se il click è dentro una di esse
   for (let i = permanentSpazialeAreas.length - 1; i >= 0; i--) {
     if (pointInPolygon({x: mx, y: my}, permanentSpazialeAreas[i].points)) {
+      const removedArea = permanentSpazialeAreas[i];
       permanentSpazialeAreas.splice(i, 1);
+
+      if (pvpManager && pvpManager.isActive()) {
+        const centerX = removedArea.points.reduce((sum, p) => sum + p.x, 0) / removedArea.points.length;
+        const centerY = removedArea.points.reduce((sum, p) => sum + p.y, 0) / removedArea.points.length;
+        
+        pvpManager.sendSpellRemoval({
+          type: 'spaziale',
+          position: { x: centerX, y: centerY },
+          polygonPoints: removedArea.points,
+          areaId: removedArea.id // Invia l'ID dell'area rimossa
+        });
+      }
+
       showDebugMessage("Area spaziale rimossa!");
       return;
     }
@@ -221,8 +241,27 @@ function simulateRightClick() {
   const dy = my - magicCircle.y;
   const dist = Math.hypot(dx, dy);
   if (dist >= magicCircle.radius - 120 && dist <= magicCircle.radius) {
+    // NUOVA LOGICA: Cancellazione manuale - rimuove anche le aree spaziali
+    if (pvpManager && pvpManager.isActive() && permanentSpazialeAreas.length > 0) {
+      // Notifica la rimozione di tutte le aree spaziali
+      for (const area of permanentSpazialeAreas) {
+        const centerX = area.points.reduce((sum, p) => sum + p.x, 0) / area.points.length;
+        const centerY = area.points.reduce((sum, p) => sum + p.y, 0) / area.points.length;
+        
+        pvpManager.sendSpellRemoval({
+          type: 'spaziale',
+          position: { x: centerX, y: centerY },
+          polygonPoints: area.points,
+          areaId: area.id
+        });
+      }
+    }
+    
+    // Pulisci le aree spaziali quando si cancella manualmente il cerchio magico
+    permanentSpazialeAreas = [];
+    
     magicCircle = null;
-    showDebugMessage("Cerchio magico cancellato");
+    showDebugMessage("Cerchio magico cancellato manualmente");
   }
 }
 
@@ -607,7 +646,11 @@ function triggerMagicCircleAction(start, end) {
     incrementaProiezioneUsataBuffer(tipo);
     showDebugMessage(`Proiezione lanciata! Cariche rimanenti: ${magicCircle.projections.length}`);
     if (magicCircle.projections.length <= 0) {
-      magicCircleToDelete = true;
+      // Esaurimento cariche - il cerchio scompare ma le aree spaziali persistono
+      magicCircle = null;
+      infusedElement = null;
+      infusedProjection = null;
+      showDebugMessage("Cerchio magico esaurito - aree spaziali persistono");
     }
   }
   // Entrambi
@@ -632,7 +675,11 @@ function triggerMagicCircleAction(start, end) {
     incrementaProiezioneUsataBuffer(tipo);
     showDebugMessage(`Proiezione lanciata con elemento ${magicCircle.elemento}! Cariche rimanenti: ${magicCircle.projections.length}`);
     if (magicCircle.projections.length <= 0) {
-      magicCircleToDelete = true;
+      // Esaurimento cariche - il cerchio scompare ma le aree spaziali persistono
+      magicCircle = null;
+      infusedElement = null;
+      infusedProjection = null;
+      showDebugMessage("Cerchio magico esaurito - aree spaziali persistono");
     }
   }
 }
@@ -972,9 +1019,26 @@ export function animate() {
       if (!element) incrementaAffinitaBuffer("spaziale", area.manaDrain);
     }
   }
+
   if (manaToDrain > 0) {
     let currentMana = getCurrentMana();
     if (currentMana <= manaToDrain) {
+      // AGGIUNGI: Notifica PvP prima di pulire le aree
+      if (pvpManager && pvpManager.isActive() && permanentSpazialeAreas.length > 0) {
+        // Notifica la rimozione di tutte le aree spaziali
+        for (const area of permanentSpazialeAreas) {
+          const centerX = area.points.reduce((sum, p) => sum + p.x, 0) / area.points.length;
+          const centerY = area.points.reduce((sum, p) => sum + p.y, 0) / area.points.length;
+          
+          pvpManager.sendSpellRemoval({
+            type: 'spaziale',
+            position: { x: centerX, y: centerY },
+            polygonPoints: area.points,
+            areaId: area.id // AGGIUNGI QUESTO
+          });
+        }
+      }
+      
       permanentSpazialeAreas = [];
       showDebugMessage("Mana esaurito! Tutte le aree spaziali sono svanite.");
       triggerBurnout();
@@ -1059,12 +1123,31 @@ export function animate() {
   drawMagicCircleDragTrail();
   // drawTemplate('terra', ctx);
 
-  if (magicCircleToDelete) {
-    magicCircle = null;
-    infusedElement = null;
-    infusedProjection = null;
-    magicCircleToDelete = false;
-  }
+  // if (magicCircleToDelete) {
+  //   // AGGIUNGI: Notifica PvP prima di pulire le aree quando si cancella il cerchio magico
+  //   if (pvpManager && pvpManager.isActive() && permanentSpazialeAreas.length > 0) {
+  //     // Notifica la rimozione di tutte le aree spaziali
+  //     for (const area of permanentSpazialeAreas) {
+  //       const centerX = area.points.reduce((sum, p) => sum + p.x, 0) / area.points.length;
+  //       const centerY = area.points.reduce((sum, p) => sum + p.y, 0) / area.points.length;
+        
+  //       pvpManager.sendSpellRemoval({
+  //         type: 'spaziale',
+  //         position: { x: centerX, y: centerY },
+  //         polygonPoints: area.points,
+  //         areaId: area.id // AGGIUNGI QUESTO
+  //       });
+  //     }
+  //   }
+    
+  //   // Pulisci anche le aree spaziali quando si cancella il cerchio magico
+  //   permanentSpazialeAreas = [];
+    
+  //   magicCircle = null;
+  //   infusedElement = null;
+  //   infusedProjection = null;
+  //   magicCircleToDelete = false;
+  // }
 }
 
 function drawLastProjectileParticles() {
@@ -1115,12 +1198,40 @@ function activateSpazialeArea(points, color) {
   const area = polygonArea(points);
   const manaDrain = Math.max(0.01, area / 10000 * 0.01);
 
-  // Salva l'area per la persistenza
-  permanentSpazialeAreas.push({ points: points.map(p => ({...p})), color, manaDrain, affinityTimer: 0 });
+  const areaId = `area_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+  permanentSpazialeAreas.push({ 
+    id: areaId, // AGGIUNGI QUESTO
+    points: points.map(p => ({...p})), 
+    color, 
+    manaDrain, 
+    affinityTimer: 0 
+  });
 
   const expForArea = Math.floor(area / 1000); // Esperienza basata sulla dimensione dell'area
   spazialExpToAdd += expForArea;
   console.log("🔮 Esperienza spaziale per creazione area:", expForArea);
+
+  if (pvpManager && pvpManager.isActive()) {
+    const centerX = points.reduce((sum, p) => sum + p.x, 0) / points.length;
+    const centerY = points.reduce((sum, p) => sum + p.y, 0) / points.length;
+    
+    console.log('[DEBUG] Invio magia spaziale al server:', {
+      type: 'spaziale',
+      position: { x: centerX, y: centerY },
+      polygonPoints: points,
+      element: 'spaziale',
+      areaId: areaId // Includi l'ID dell'area
+    });
+
+    pvpManager.sendSpellCast({
+      type: 'spaziale',
+      position: { x: centerX, y: centerY },
+      polygonPoints: points,
+      element: 'spaziale',
+      areaId: areaId // Includi l'ID dell'area
+    });
+  }
 
   // Effetto visivo area spaziale (opzionale, per feedback immediato)
   ctx.save();

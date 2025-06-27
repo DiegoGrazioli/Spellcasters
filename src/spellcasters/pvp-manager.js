@@ -51,6 +51,8 @@ export class PvPManager {
         
         this.processedHits = new Set(); // Traccia hit già processati
 
+        this.processedSpatialHits = new Set(); // Traccia hit spaziali già processati
+
         this.healthPersistenceKey = null;
 
         this.intentionalDisconnect = false;
@@ -184,8 +186,8 @@ export class PvPManager {
     }
 
     connectToGameServer() {
-        // const wsUrl = 'ws://localhost:8080'; // Usa server locale per debugging
-        const wsUrl = 'wss://spellcasters.onrender.com'; // Usa server remoto per produzione
+        const wsUrl = 'ws://localhost:8080'; // Usa server locale per debugging
+        // const wsUrl = 'wss://spellcasters.onrender.com'; // Usa server remoto per produzione
         
         try {
             this.ws = new WebSocket(wsUrl);
@@ -281,9 +283,41 @@ export class PvPManager {
             case 'playerDisconnect':
                 this.handlePlayerDisconnect(data);
                 break;
+            case 'opponentSpellRemoval':
+                this.handleOpponentSpellRemoval(data);
+                break;
             case 'error':
                 console.error('❌ Errore server:', data.message);
                 break;
+        }
+    }
+
+    handleOpponentSpellRemoval(data) {
+        console.log('[DEBUG] handleOpponentSpellRemoval chiamato:', data);
+        
+        if (data.spellType === 'spaziale') {
+            if (data.areaId) {
+                // Rimuovi SOLO l'intervallo specifico con questo ID
+                if (this.activeSpatialIntervals && this.activeSpatialIntervals[data.areaId]) {
+                    clearInterval(this.activeSpatialIntervals[data.areaId]);
+                    delete this.activeSpatialIntervals[data.areaId];
+                    console.log(`🛑 [SPAZIALE] Intervallo di danno fermato per area specifica: ${data.areaId}`);
+                } else {
+                    console.log(`⚠️ [SPAZIALE] Nessun intervallo trovato per area: ${data.areaId}`);
+                }
+            } else {
+                // Se non c'è areaId, rimuovi TUTTE le aree spaziali (mana esaurito o cerchio magico cancellato)
+                if (this.activeSpatialIntervals) {
+                    for (const [spellId, interval] of Object.entries(this.activeSpatialIntervals)) {
+                        if (spellId.includes('spaziale') || spellId.startsWith('area_')) {
+                            clearInterval(interval);
+                            delete this.activeSpatialIntervals[spellId];
+                            console.log(`🛑 [SPAZIALE] Intervallo di danno fermato (rimozione totale): ${spellId}`);
+                        }
+                    }
+                }
+                console.log(`🛑 [SPAZIALE] Tutte le aree spaziali rimosse (mana esaurito o cerchio cancellato)`);
+            }
         }
     }
 
@@ -392,8 +426,45 @@ export class PvPManager {
     }
 
     handleOpponentSpell(data) {
-        // Gestisce effetti spell dell'avversario
-        if (data.spellType && this.gameHooks.activeMagicParticles) {
+    console.log('[DEBUG] handleOpponentSpell chiamato:', data);
+        // Gestione magia spaziale con danno periodico
+        if (data.spellType === 'spaziale' && data.position && data.polygonPoints) {
+            // USA L'ID DELL'AREA invece del timestamp
+            const spellId = data.areaId || `${data.spellType}_${data.timestamp}`;
+            if (!this.activeSpatialIntervals) this.activeSpatialIntervals = {};
+
+            // Se non c'è già un intervallo attivo per questa spell, crealo
+            if (!this.activeSpatialIntervals[spellId]) {
+                let ticks = 0;
+                this.activeSpatialIntervals[spellId] = setInterval(() => {
+                    const playerPos = this.gameHooks.virtualMouse;
+                    
+                    // Controlla se il player è dentro il poligono
+                    if (this.pointInPolygon(playerPos, data.polygonPoints)) {
+                        const damage = 5; // Danno per tick
+                        const healthBefore = this.gameHooks.playerHealth;
+                        this.gameHooks.playerHealth -= damage;
+                        const healthAfter = this.gameHooks.playerHealth;
+
+                        this.saveHealthToStorage();
+                        this.showDamageEffect(damage, true);
+
+                        console.log(`💥 [SPAZIALE][TICK] Player colpito da magia spaziale! Area: ${spellId} Tick: ${ticks} Danno: ${damage} | Vita: ${healthBefore} → ${healthAfter}`);
+
+                        if (this.gameHooks.playerHealth <= 0) {
+                            clearInterval(this.activeSpatialIntervals[spellId]);
+                            delete this.activeSpatialIntervals[spellId];
+                            this.endMatch(false);
+                        }
+                    } else {
+                        console.log(`[DEBUG] Player fuori dall'area spaziale ${spellId}. Pos: ${playerPos.x},${playerPos.y}`);
+                    }
+
+                    ticks++;
+                    // RIMUOVI IL LIMITE DI TEMPO
+                }, 500); // Ogni 500ms
+            }
+        } else if (data.spellType && this.gameHooks.activeMagicParticles) {
             this.createOpponentSpellEffect(data);
         }
     }
@@ -447,6 +518,27 @@ export class PvPManager {
     handleGameEnd(data) {
         const won = data.winner === this.playerRole;
         this.endMatch(won);
+    }
+
+    sendSpellRemoval(spellData) {
+        if (!this.isConnected) {
+            console.log('[DEBUG] Non connesso, impossibile inviare rimozione spell');
+            return;
+        }
+
+        const data = {
+            type: 'spellRemoval',
+            matchId: this.matchData.matchId,
+            playerRole: this.playerRole,
+            spellType: spellData.type,
+            position: spellData.position,
+            polygonPoints: spellData.polygonPoints,
+            areaId: spellData.areaId, 
+            timestamp: Date.now()
+        };
+
+        console.log('[DEBUG] Invio rimozione spell al server:', data);
+        this.ws.send(JSON.stringify(data));
     }
 
     // METODI DI SINCRONIZZAZIONE CON MAIN.JS
@@ -587,7 +679,10 @@ export class PvPManager {
     }
 
     sendSpellCast(spellData) {
-        if (!this.isConnected) return;
+        if (!this.isConnected) {
+            console.log('[DEBUG] Non connesso, impossibile inviare spell');
+            return;
+        }
 
         const data = {
             type: 'spellCast',
@@ -595,7 +690,9 @@ export class PvPManager {
             playerRole: this.playerRole,
             spellType: spellData.type,
             position: spellData.position,
+            polygonPoints: spellData.polygonPoints, // AGGIUNGI QUESTO invece di radius
             element: spellData.element,
+            areaId: spellData.areaId,
             timestamp: Date.now()
         };
 
@@ -938,5 +1035,22 @@ export class PvPManager {
             playerHealth: this.gameHooks.playerHealth,
             opponentHealth: this.opponent.health
         };
+    }
+
+    pointInPolygon(point, vs) {
+        const x = point.x;
+        const y = point.y;
+        
+        let inside = false;
+        for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+            const xi = vs[i].x, yi = vs[i].y;
+            const xj = vs[j].x, yj = vs[j].y;
+            
+            if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) {
+                inside = !inside;
+            }
+        }
+        
+        return inside;
     }
 }
