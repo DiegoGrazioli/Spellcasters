@@ -166,6 +166,9 @@ canvas.addEventListener("mouseup", (e) => {
     if (magicCircle.projections.length <= 0) {
       // Esaurimento cariche durante creazione area spaziale - il cerchio scompare ma le aree persistono
       magicCircle = null;
+      if (pvpManager && pvpManager.isActive()) {
+          pvpManager.sendMagicCircleUpdate(null);
+      }
       infusedElement = null;
       infusedProjection = null;
       showDebugMessage("Cerchio magico esaurito dopo creazione area - aree spaziali persistono");
@@ -261,6 +264,9 @@ function simulateRightClick() {
     permanentSpazialeAreas = [];
     
     magicCircle = null;
+    if (pvpManager && pvpManager.isActive()) {
+        pvpManager.sendMagicCircleUpdate(null);
+    }
     showDebugMessage("Cerchio magico cancellato manualmente");
   }
 }
@@ -648,6 +654,9 @@ function triggerMagicCircleAction(start, end) {
     if (magicCircle.projections.length <= 0) {
       // Esaurimento cariche - il cerchio scompare ma le aree spaziali persistono
       magicCircle = null;
+      if (pvpManager && pvpManager.isActive()) {
+          pvpManager.sendMagicCircleUpdate(null);
+      }
       infusedElement = null;
       infusedProjection = null;
       showDebugMessage("Cerchio magico esaurito - aree spaziali persistono");
@@ -677,6 +686,9 @@ function triggerMagicCircleAction(start, end) {
     if (magicCircle.projections.length <= 0) {
       // Esaurimento cariche - il cerchio scompare ma le aree spaziali persistono
       magicCircle = null;
+      if (pvpManager && pvpManager.isActive()) {
+          pvpManager.sendMagicCircleUpdate(null);
+      }
       infusedElement = null;
       infusedProjection = null;
       showDebugMessage("Cerchio magico esaurito - aree spaziali persistono");

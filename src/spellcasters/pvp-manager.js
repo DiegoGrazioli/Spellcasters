@@ -1,6 +1,7 @@
 // pvp-manager.js - Gestione partite PvP integrata con main.js
 import { VirtualMouseEntity, globalCollisionSystem } from "./collision-system.js";
 import { triggerCameraShake, updateRedOverlay } from './damage-effects.js';
+import { drawProjectilePolygonPattern } from "./element-patterns.js";
 
 export class PvPManager {
     constructor(gameCanvas, gameContext) {
@@ -56,6 +57,8 @@ export class PvPManager {
         this.healthPersistenceKey = null;
 
         this.intentionalDisconnect = false;
+
+        this.opponentCircleRotation = 0;
 
         this.initializePvP();
 
@@ -186,8 +189,8 @@ export class PvPManager {
     }
 
     connectToGameServer() {
-        const wsUrl = 'ws://localhost:8080'; // Usa server locale per debugging
-        // const wsUrl = 'wss://spellcasters.onrender.com'; // Usa server remoto per produzione
+        // const wsUrl = 'ws://localhost:8080'; // Usa server locale per debugging
+        const wsUrl = 'wss://spellcasters.onrender.com'; // Usa server remoto per produzione
         
         try {
             this.ws = new WebSocket(wsUrl);
@@ -421,6 +424,12 @@ export class PvPManager {
     }
 
     handleOpponentMagicCircle(data) {
+        // Se data.magicCircle è null, rimuovi il cerchio magico avversario
+        if (data.magicCircle === null) {
+            this.opponent.magicCircle = null;
+            return;
+        }
+        
         // Aggiorna cerchio magico avversario
         this.opponent.magicCircle = data.magicCircle;
     }
@@ -548,6 +557,8 @@ export class PvPManager {
      */
     syncWithMainGame(gameState) {
         const now = Date.now();
+
+        this.opponentCircleRotation += 0.003;
         
         // Aggiorna riferimenti ai sistemi di main.js
         this.gameHooks.virtualMouse = gameState.virtualMouse;
@@ -600,10 +611,10 @@ export class PvPManager {
             radius: magicCircle.radius,
             element: magicCircle.elemento,
             projections: magicCircle.projections?.length || 0
-        } : null;
-        
+        } : null; // Gestisce il caso null
+
         const stateChanged = JSON.stringify(currentState) !== JSON.stringify(this.lastMagicCircleState);
-        
+
         if (stateChanged && this.isConnected) {
             this.sendMagicCircleUpdate(magicCircle);
             this.lastMagicCircleState = currentState;
@@ -659,19 +670,19 @@ export class PvPManager {
     }
 
     sendMagicCircleUpdate(magicCircle) {
-        if (!this.isConnected || !magicCircle) return;
+        if (!this.isConnected) return;
 
         const data = {
             type: 'magicCircleUpdate',
             matchId: this.matchData.matchId,
             playerRole: this.playerRole,
-            magicCircle: {
+            magicCircle: magicCircle ? {
                 x: magicCircle.x,
                 y: magicCircle.y,
                 radius: magicCircle.radius,
                 element: magicCircle.elemento,
                 projections: magicCircle.projections
-            },
+            } : null, // Invia null se il cerchio è stato rimosso
             timestamp: Date.now()
         };
 
@@ -883,26 +894,659 @@ export class PvPManager {
         ctx.restore();
     }
 
+    drawOpponentProjectilePattern(ctx, x, y, r, color) {
+        ctx.save();
+        ctx.translate(x, y);
+        
+        const R = r * 0.3;
+        
+        // Cerchio principale con colore avversario
+        ctx.beginPath();
+        ctx.arc(0, 0, R, 0, 2 * Math.PI);
+        ctx.lineWidth = 4.2;
+        ctx.strokeStyle = color;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 12;
+        ctx.globalAlpha = 0.85;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 1;
+        
+        // Anello interno sottile
+        ctx.beginPath();
+        ctx.arc(0, 0, R * 0.63, 0, 2 * Math.PI);
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = color;
+        ctx.globalAlpha = 0.5;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        
+        // Anello esterno sottile
+        ctx.beginPath();
+        ctx.arc(0, 0, R * 1, 0, 2 * Math.PI);
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = color;
+        ctx.globalAlpha = 0.5;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        
+        // Glifi magici (piccoli archi)
+        for (let i = 0; i < 6; i++) {
+            let angle = (Math.PI * 2 / 6) * i;
+            ctx.save();
+            ctx.rotate(angle);
+            ctx.beginPath();
+            ctx.arc(R * 0.82, 0, R * 0.1, 0, Math.PI);
+            ctx.lineWidth = 1.1;
+            ctx.strokeStyle = color;
+            ctx.globalAlpha = 0.7;
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+            ctx.restore();
+        }
+        
+        // Punti decorativi interni
+        for (let i = 0; i < 8; i++) {
+            let angle = (Math.PI * 2 / 8) * i;
+            let px = Math.cos(angle) * r * 0.82 * 0.3;
+            let py = Math.sin(angle) * r * 0.82 * 0.3;
+            ctx.beginPath();
+            ctx.arc(px, py, 2, 0, 2 * Math.PI);
+            ctx.fillStyle = color;
+            ctx.globalAlpha = 0.7;
+            ctx.fill();
+            ctx.globalAlpha = 1;
+        }
+        
+        ctx.restore();
+    }
+
+    drawOpponentSpazialePattern(ctx, x, y, r, color, rotation) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(rotation);
+
+        // Cerchi concentrici con colore avversario
+        for (let i = 1; i <= 4; i++) {
+            ctx.beginPath();
+            ctx.arc(0, 0, r * (0.2 + i * 0.15), 0, 2 * Math.PI);
+            ctx.strokeStyle = color;
+            ctx.globalAlpha = 0.4 + i * 0.1;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+        }
+        
+        // Pattern di onde spaziali
+        const waves = 12;
+        for (let i = 0; i < waves; i++) {
+            const angle = (Math.PI * 2 / waves) * i;
+            ctx.save();
+            ctx.rotate(angle);
+            
+            ctx.beginPath();
+            ctx.moveTo(r * 0.2, 0);
+            
+            // Curva ondulata
+            for (let j = 0; j < 10; j++) {
+                const t = j / 9;
+                const waveX = r * (0.2 + t * 0.6);
+                const waveY = Math.sin(t * Math.PI * 3) * r * 0.1;
+                ctx.lineTo(waveX, waveY);
+            }
+            
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1.5;
+            ctx.globalAlpha = 0.6;
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+            ctx.restore();
+        }
+        
+        // Centro luminoso
+        ctx.beginPath();
+        ctx.arc(0, 0, r * 0.15, 0, 2 * Math.PI);
+        ctx.fillStyle = color.replace(')', ', 0.3)');
+        ctx.fill();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        ctx.restore();
+    }
+
     drawOpponentMagicCircle(ctx) {
         const circle = this.opponent.magicCircle;
         if (!circle) return;
         
+        const { x, y, radius, element } = circle;
+        const thickness = 3;
+        
         ctx.save();
-        ctx.strokeStyle = '#ff6666';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([5, 5]); // Tratteggiato per distinguere
-        
-        // Cerchio principale
+        // Applica la stessa rotazione del player
+        ctx.translate(x, y);
+        ctx.rotate(this.opponentCircleRotation);
+        ctx.translate(-x, -y);
+
+        // Glow radiale per avversario
+        if (element) {
+            const opponentColor = this.getOpponentElementColor(element);
+            const glowRadius = radius + 24;
+            const grad = ctx.createRadialGradient(x, y, 0, x, y, glowRadius);
+            grad.addColorStop(0, opponentColor + 'cc');
+            grad.addColorStop(0.45, opponentColor + '44');
+            grad.addColorStop(0.85, opponentColor + '11');
+            grad.addColorStop(1, opponentColor + '00');
+            ctx.save();
+            ctx.globalAlpha = 0.45;
+            ctx.beginPath();
+            ctx.arc(x, y, glowRadius, 0, 2 * Math.PI);
+            ctx.fillStyle = grad;
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // Pattern elementale per avversario
+        if (element) {
+            this.drawOpponentElementPattern(ctx, x, y, radius * 0.82, element);
+        }
+
+        // Pattern di proiezione per avversario
+        let projColor = element ? this.getOpponentElementColor(element) : "#ff6666";
+        if (circle.projections && circle.projections.length > 0) {
+            this.drawOpponentProjectilePolygonPattern(
+                ctx,
+                x,
+                y,
+                radius * 1.2,
+                circle.projections.length,
+                projColor,
+                -2 * this.opponentCircleRotation, // Stessa rotazione del player
+                circle.projections
+            );
+        }
+
+        // Cerchi principali
+        ctx.lineWidth = thickness;
+        ctx.strokeStyle = element ? this.getOpponentElementColor(element) : "#ff6666";
         ctx.beginPath();
-        ctx.arc(circle.x, circle.y, circle.radius, 0, 2 * Math.PI);
+        ctx.arc(x, y, radius, 0, 2 * Math.PI);
         ctx.stroke();
-        
-        // Cerchio esterno
         ctx.beginPath();
-        ctx.arc(circle.x, circle.y, circle.radius + 20, 0, 2 * Math.PI);
+        ctx.arc(x, y, radius + 20, 0, 2 * Math.PI);
         ctx.stroke();
-        
+
+        // Segmenti radiali (identici al player)
+        ctx.lineWidth = 1;
+        const numSegments = 24;
+        for (let i = 0; i < numSegments; i++) {
+            const angle = (2 * Math.PI / numSegments) * i;
+            const innerX = x + Math.cos(angle) * radius;
+            const innerY = y + Math.sin(angle) * radius;
+            const outerX = x + Math.cos(angle) * (radius + 20);
+            const outerY = y + Math.sin(angle) * (radius + 20);
+            ctx.beginPath();
+            ctx.moveTo(outerX, outerY);
+            ctx.lineTo(innerX, innerY);
+            ctx.stroke();
+        }
         ctx.restore();
+
+        // Particelle fluttuanti attorno al cerchio avversario (identiche al player)
+        for (let i = 0; i < 4; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = radius + 10 + Math.random() * 15;
+            const px = x + Math.cos(angle + this.opponentCircleRotation) * dist;
+            const py = y + Math.sin(angle + this.opponentCircleRotation) * dist;
+            
+            if (this.gameHooks.activeMagicParticles) {
+                this.gameHooks.activeMagicParticles.push({
+                    x: px,
+                    y: py,
+                    radius: Math.random() * 1.5 + 0.5,
+                    alpha: 0.1 + Math.random() * 0.1,
+                    dx: (Math.random() - 0.5) * 0.3,
+                    dy: (Math.random() - 0.5) * 0.3,
+                    color: element ? this.getOpponentElementColor(element) + "," : "rgba(255, 102, 102,",
+                });
+            }
+        }
+    }
+
+    drawOpponentProjectilePolygonPattern(ctx, x, y, r, count, color, rotation, tipi) {
+        drawProjectilePolygonPattern(ctx, x, y, r, count, color, rotation, tipi);
+    }
+
+    getElementColor(element) {
+        const colors = {
+            fuoco: '#ff5555',
+            acqua: '#5555ff',
+            aria: '#aaaaee',
+            terra: '#55aa55',
+            fulmine: '#ffff55',
+            luce: '#ffffff'
+        };
+        return colors[element] || '#ffffff';
+    }
+
+    getOpponentElementColor(element) {
+        const opponentColors = {
+            fuoco: '#ff8888',    // Rosso più chiaro
+            acqua: '#ff6666',    // Rosso-violaceo
+            aria: '#ff9999',     // Rosa-rosso
+            terra: '#cc4444',    // Rosso scuro
+            fulmine: '#ffaaaa',  // Rosa chiaro
+            luce: '#ff7777'      // Rosso medio
+        };
+        return opponentColors[element] || '#ff6666';
+    }
+
+    replaceColorWithOpponent(color, element) {
+        const opponentColor = this.getOpponentElementColor(element);
+
+        // Lista dei colori da sostituire
+        const elementColorMap = {
+            'orange': opponentColor,
+            opponentColor: opponentColor,
+            '#ff5555': opponentColor,
+            '#5555ff': opponentColor,
+            '#aaaaee': opponentColor,
+            '#55aa55': opponentColor,
+            '#ffff55': opponentColor,
+            '#ffffff': opponentColor
+        };
+
+        // Sostituisci se trova una corrispondenza
+        for (const [original, replacement] of Object.entries(elementColorMap)) {
+            if (color && color.includes && color.includes(original.replace('#', ''))) {
+                return replacement;
+            }
+        }
+
+        return color;
+    }
+
+    drawOpponentElementPattern(ctx, x, y, r, element) {
+        // Approccio diretto: disegniamo manualmente i pattern con i colori avversario
+        const opponentColor = this.getOpponentElementColor(element);
+
+        ctx.save();
+        ctx.translate(x, y);
+
+        if (element === 'fuoco') {
+            // Copia esatta del pattern fuoco da element-patterns.js ma con colore avversario
+            for (let i = 0; i < 16; i++) {
+                let angle = (Math.PI * 2 / 16) * i;
+                ctx.save();
+                ctx.rotate(angle);
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(r * 0.5, 0);
+                ctx.lineTo(r * 0.7, Math.sin(Math.PI / 8) * r * 0.2);
+                ctx.lineTo(r * 0.9, 0);
+                ctx.strokeStyle = opponentColor;
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // Cerchio piccolo centrale
+            ctx.beginPath();
+            ctx.arc(0, 0, r * 0.22, 0, 2 * Math.PI);
+            ctx.strokeStyle = opponentColor;
+            ctx.lineWidth = 3;
+            ctx.globalAlpha = 1;
+            ctx.stroke();
+
+            // Cerchio medio
+            let rMedio = (r * 0.22 + r * 0.9) / 2;
+            ctx.beginPath();
+            ctx.arc(0, 0, rMedio, 0, 2 * Math.PI);
+            ctx.strokeStyle = opponentColor;
+            ctx.lineWidth = 3;
+            ctx.globalAlpha = 1;
+            ctx.stroke();
+
+            // Cerchio esterno che racchiude le fiamme
+            ctx.beginPath();
+            ctx.arc(0, 0, r * 0.9, 0, 2 * Math.PI);
+            ctx.strokeStyle = opponentColor;
+            ctx.lineWidth = 3;
+            ctx.globalAlpha = 0.7;
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+
+            // Secondo cerchio esterno
+            ctx.beginPath();
+            ctx.arc(0, 0, r * 0.97, 0, 2 * Math.PI);
+            ctx.strokeStyle = opponentColor;
+            ctx.lineWidth = 3;
+            ctx.globalAlpha = 1;
+            ctx.stroke();
+
+            // Gradiente di riempimento
+            let grad = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+            grad.addColorStop(0, opponentColor + '40');
+            grad.addColorStop(0.5, opponentColor + '20');
+            grad.addColorStop(1, opponentColor + '10');
+            ctx.globalAlpha = 0.25;
+            ctx.beginPath();
+            ctx.arc(0, 0, r * 0.95, 0, 2 * Math.PI);
+            ctx.fillStyle = grad;
+            ctx.fill();
+            ctx.globalAlpha = 1;
+        }
+
+        else if (element === 'aria') {
+            // Cerchi concentrici
+            for (let i = 1; i <= 3; i++) {
+                ctx.beginPath();
+                ctx.arc(0, 0, r * (0.3 + i * 0.18), 0, 2 * Math.PI);
+                ctx.strokeStyle = opponentColor;
+                ctx.globalAlpha = 0.5;
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+            }
+            // Cerchio alle estremità interne delle linee radiali
+            ctx.beginPath();
+            ctx.arc(0, 0, r * 0.3, 0, 2 * Math.PI);
+            ctx.strokeStyle = '#aaf';
+            ctx.lineWidth = 3;
+            ctx.globalAlpha = 1;
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+            // Cerchio alle estremità esterne delle linee radiali
+            ctx.beginPath();
+            ctx.arc(0, 0, r * 0.81, 0, 2 * Math.PI);
+            ctx.strokeStyle = '#aaf';
+            ctx.lineWidth = 3;
+            ctx.globalAlpha = 1;
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+            // Linee radiali
+            for (let i = 0; i < 12; i++) {
+                let angle = (Math.PI * 2 / 12) * i;
+                ctx.beginPath();
+                ctx.moveTo(Math.cos(angle) * r * 0.3, Math.sin(angle) * r * 0.3);
+                ctx.lineTo(Math.cos(angle) * r * 0.84, Math.sin(angle) * r * 0.84);
+                ctx.strokeStyle = '#aaf';
+                ctx.globalAlpha = 0.4;
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+            }
+            // Curve a spirale
+            ctx.save();
+            ctx.rotate(Math.PI / 12);
+            for (let s = 0; s < 3; s++) {
+                ctx.beginPath();
+                for (let t = 0; t < 60; t++) {
+                    let theta = t * 0.2 + s * Math.PI * 2 / 3;
+                    let rad = r * 0.3 + t * (r * 0.5 / 60) + Math.sin(theta * 2) * 2;
+                    let px = Math.cos(theta) * rad;
+                    let py = Math.sin(theta) * rad;
+                    if (t === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.strokeStyle = opponentColor;
+                ctx.globalAlpha = 0.7;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+            ctx.restore();
+            // Cerchio esterno aggiuntivo
+            ctx.beginPath();
+            ctx.arc(0, 0, r * 0.97, 0, 2 * Math.PI);
+            ctx.strokeStyle = '#aaf';
+            ctx.lineWidth = 3;
+            ctx.globalAlpha = 1;
+            ctx.stroke();
+        }
+
+        else if (element === 'acqua') {
+            // Pattern ondulato acqua
+            for (let i = 1; i <= 4; i++) {
+                ctx.beginPath();
+                ctx.arc(0, 0, r * (0.25 + i * 0.15), 0, 2 * Math.PI);
+                if (i === 1) {
+                    ctx.strokeStyle = opponentColor;
+                    ctx.lineWidth = 3;
+                    ctx.globalAlpha = 1;
+                } else {
+                    ctx.strokeStyle = 'rgba(0,180,255,0.5)';
+                    ctx.lineWidth = 2;
+                    ctx.globalAlpha = 1;
+                }
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+            }
+            // Onde regolari
+            for (let i = 1; i <= 3; i++) {
+                ctx.save();
+                ctx.rotate(i * Math.PI / 6);
+                ctx.beginPath();
+                for (let t = 0; t <= 64; t++) {
+                    let theta = t * Math.PI * 2 / 64;
+                    let rad = r * (0.35 + i * 0.13) + Math.sin(theta * 6 + i) * 7;
+                    let px = Math.cos(theta) * rad;
+                    let py = Math.sin(theta) * rad;
+                    if (t === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.closePath();
+                ctx.strokeStyle = opponentColor;
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+                ctx.restore();
+            }
+            // Piccoli glifi/gocce
+            for (let i = 0; i < 10; i++) {
+                let angle = (Math.PI * 2 / 10) * i + Math.PI / 10;
+                let rad = r * 0.7;
+                ctx.save();
+                ctx.rotate(angle);
+                ctx.beginPath();
+                ctx.ellipse(rad, 0, 6, 3, angle, 0, 2 * Math.PI);
+                ctx.fillStyle = 'rgba(0,200,255,0.5)';
+                ctx.fill();
+                ctx.restore();
+            }
+            // Cerchio esterno aggiuntivo
+            ctx.beginPath();
+            ctx.arc(0, 0, r * 0.97, 0, 2 * Math.PI);
+            ctx.strokeStyle = opponentColor;
+            ctx.lineWidth = 3;
+            ctx.globalAlpha = 1;
+            ctx.stroke();
+        }
+
+        else if (element === 'terra') {
+            // Cerchi concentrici
+            for (let i = 1; i <= 3; i++) {
+                ctx.beginPath();
+                ctx.arc(0, 0, r * (0.32 + i * 0.18), 0, 2 * Math.PI);
+                if (i === 2) {
+                    ctx.strokeStyle = opponentColor;
+                    ctx.lineWidth = 3;
+                    ctx.globalAlpha = 1;
+                } else {
+                    ctx.strokeStyle = opponentColor;
+                    ctx.globalAlpha = 0.5;
+                    ctx.lineWidth = 2;
+                }
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+            }
+            // Pentagono centrale
+            ctx.save();
+            ctx.beginPath();
+            for (let i = 0; i < 5; i++) {
+                let angle = (Math.PI * 2 / 5) * i - Math.PI / 2;
+                let px = Math.cos(angle) * r * 0.38;
+                let py = Math.sin(angle) * r * 0.38;
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.strokeStyle = opponentColor;
+            ctx.lineWidth = 3;
+            ctx.globalAlpha = 0.8;
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+            ctx.restore();
+            // Pentacolo (stelletta)
+            ctx.save();
+            ctx.beginPath();
+            for (let i = 0; i < 5; i++) {
+                let angle = (Math.PI * 2 / 5) * i - Math.PI / 2;
+                let px = Math.cos(angle) * r * 0.38;
+                let py = Math.sin(angle) * r * 0.38;
+                ctx.lineTo(px, py);
+                let next = (i + 2) % 5;
+                let angle2 = (Math.PI * 2 / 5) * next - Math.PI / 2;
+                let px2 = Math.cos(angle2) * r * 0.38;
+                let py2 = Math.sin(angle2) * r * 0.38;
+                ctx.lineTo(px2, py2);
+            }
+            ctx.closePath();
+            ctx.strokeStyle = opponentColor;
+            ctx.lineWidth = 1.5;
+            ctx.globalAlpha = 0.7;
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+            ctx.restore();
+            // Linee radiali
+            for (let i = 0; i < 10; i++) {
+                let angle = (Math.PI * 2 / 10) * i;
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(Math.cos(angle) * r * 0.85, Math.sin(angle) * r * 0.85);
+                ctx.strokeStyle = '#4a3';
+                ctx.lineWidth = 1;
+                ctx.globalAlpha = 0.4;
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+            }
+            // Cerchio esterno aggiuntivo
+            ctx.beginPath();
+            ctx.arc(0, 0, r * 0.97, 0, 2 * Math.PI);
+            ctx.strokeStyle = opponentColor;
+            ctx.lineWidth = 3;
+            ctx.globalAlpha = 1;
+            ctx.stroke();
+        }
+
+        else if (element === 'fulmine') {
+            // Pattern zigzag
+            const rays = 12;
+            for (let i = 0; i < rays; i++) {
+                let angle = (Math.PI * 2 / rays) * i;
+                ctx.save();
+                ctx.rotate(angle);
+
+                ctx.beginPath();
+                ctx.moveTo(r * 0.2, 0);
+
+                // Zigzag
+                for (let j = 1; j <= 8; j++) {
+                    let zigX = r * (0.2 + j * 0.08);
+                    let zigY = (j % 2 === 0 ? 1 : -1) * r * 0.05;
+                    ctx.lineTo(zigX, zigY);
+                }
+
+                ctx.strokeStyle = opponentColor;
+                ctx.lineWidth = 2;
+                ctx.globalAlpha = 0.8;
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+                ctx.restore();
+            }
+
+            // Cerchio centrale
+            ctx.beginPath();
+            ctx.arc(0, 0, r * 0.15, 0, 2 * Math.PI);
+            ctx.strokeStyle = opponentColor;
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // Archi elettrici
+            for (let i = 0; i < 6; i++) {
+                let angle = (Math.PI * 2 / 6) * i;
+                ctx.beginPath();
+                ctx.arc(Math.cos(angle) * r * 0.6, Math.sin(angle) * r * 0.6, r * 0.1, 0, 2 * Math.PI);
+                ctx.strokeStyle = opponentColor;
+                ctx.lineWidth = 1.5;
+                ctx.globalAlpha = 0.7;
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+            }
+        }
+
+        else if (element === 'luce') {
+            // Pattern raggi
+            const rays = 16;
+            for (let i = 0; i < rays; i++) {
+                let angle = (Math.PI * 2 / rays) * i;
+                ctx.save();
+                ctx.rotate(angle);
+
+                // Raggio principale
+                ctx.beginPath();
+                ctx.moveTo(r * 0.1, 0);
+                ctx.lineTo(r * 0.9, 0);
+                ctx.strokeStyle = opponentColor;
+                ctx.lineWidth = i % 2 === 0 ? 3 : 1.5;
+                ctx.globalAlpha = i % 2 === 0 ? 0.8 : 0.5;
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+                ctx.restore();
+            }
+
+            // Cerchi concentrici
+            for (let i = 1; i <= 4; i++) {
+                ctx.beginPath();
+                ctx.arc(0, 0, r * (0.15 + i * 0.15), 0, 2 * Math.PI);
+                ctx.strokeStyle = opponentColor;
+                ctx.lineWidth = 2;
+                ctx.globalAlpha = 0.9 - i * 0.15;
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+            }
+
+            // Centro luminoso
+            ctx.beginPath();
+            ctx.arc(0, 0, r * 0.1, 0, 2 * Math.PI);
+            ctx.fillStyle = opponentColor + '99';
+            ctx.fill();
+        }
+
+        ctx.restore();
+    }
+
+    replaceColorWithOpponent(color, element) {
+        const opponentColor = this.getOpponentElementColor(element);
+        
+        // Lista dei colori da sostituire
+        const elementColorMap = {
+            'orange': opponentColor,
+            opponentColor: opponentColor,
+            '#ff5555': opponentColor,
+            '#5555ff': opponentColor,
+            '#aaaaee': opponentColor,
+            '#55aa55': opponentColor,
+            '#ffff55': opponentColor,
+            '#ffffff': opponentColor
+        };
+        
+        // Sostituisci se trova una corrispondenza
+        for (const [original, replacement] of Object.entries(elementColorMap)) {
+            if (color && color.includes && color.includes(original.replace('#', ''))) {
+                return replacement;
+            }
+        }
+        
+        return color;
     }
 
     drawOpponentCasting(ctx) {
