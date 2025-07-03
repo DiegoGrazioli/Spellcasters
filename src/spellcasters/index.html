@@ -180,6 +180,9 @@
         player = await getPlayerData(user);
         if (player) {
           player.username = user;
+          // Assicura che abbia tutti i campi necessari
+          if (!player.affinita) player.affinita = {};
+          if (!player.predisposizione) player.predisposizione = {};
           savePlayer(player); // Salva localmente per i prossimi login
         }
       }
