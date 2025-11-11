@@ -263,8 +263,8 @@ export class PvPManager {
     }
 
     connectToGameServer() {
-        // const wsUrl = 'ws://localhost:8080'; // Usa server locale per debugging
-        const wsUrl = 'wss://spellcasters.onrender.com'; // Usa server remoto per produzione
+        const wsUrl = 'ws://localhost:8080'; // Usa server locale per debugging
+        // const wsUrl = 'wss://spellcasters.onrender.com'; // Usa server remoto per produzione
         
         try {
             this.ws = new WebSocket(wsUrl);
@@ -402,30 +402,18 @@ export class PvPManager {
 
     handleOpponentSpellRemoval(data) {
         console.log('[DEBUG] handleOpponentSpellRemoval chiamato:', data);
-        
-        if (data.spellType === 'spaziale') {
-            if (data.areaId) {
-                // Rimuovi SOLO l'intervallo specifico con questo ID
-                if (this.activeSpatialIntervals && this.activeSpatialIntervals[data.areaId]) {
-                    clearInterval(this.activeSpatialIntervals[data.areaId]);
-                    delete this.activeSpatialIntervals[data.areaId];
-                    console.log(`🛑 [SPAZIALE] Intervallo di danno fermato per area specifica: ${data.areaId}`);
-                } else {
-                    console.log(`⚠️ [SPAZIALE] Nessun intervallo trovato per area: ${data.areaId}`);
-                }
-            } else {
-                // Se non c'è areaId, rimuovi TUTTE le aree spaziali (mana esaurito o cerchio magico cancellato)
-                if (this.activeSpatialIntervals) {
-                    for (const [spellId, interval] of Object.entries(this.activeSpatialIntervals)) {
-                        if (spellId.includes('spaziale') || spellId.startsWith('area_')) {
-                            clearInterval(interval);
-                            delete this.activeSpatialIntervals[spellId];
-                            console.log(`🛑 [SPAZIALE] Intervallo di danno fermato (rimozione totale): ${spellId}`);
-                        }
-                    }
-                }
-                console.log(`🛑 [SPAZIALE] Tutte le aree spaziali rimosse (mana esaurito o cerchio cancellato)`);
-            }
+    
+        // Rimuovi l'intervallo associato all'area
+        if (this.activeSpatialIntervals && this.activeSpatialIntervals[data.areaId]) {
+            clearInterval(this.activeSpatialIntervals[data.areaId]);
+            delete this.activeSpatialIntervals[data.areaId];
+            console.log(`🛑 [SPAZIALE] Intervallo di danno avversario rimosso: ${data.areaId}`);
+        }
+    
+        // Rimuovi l'area dall'array locale delle aree avversarie
+        if (this.opponentSpazialeAreas) {
+            this.opponentSpazialeAreas = this.opponentSpazialeAreas.filter(area => area.id !== data.areaId);
+            console.log(`🗑️ [SPAZIALE] Area avversaria rimossa localmente: ${data.areaId}, Rimaste: ${this.opponentSpazialeAreas.length}`);
         }
     }
 
@@ -546,41 +534,85 @@ export class PvPManager {
             // USA L'ID DELL'AREA invece del timestamp
             const spellId = data.areaId || `${data.spellType}_${data.timestamp}`;
             if (!this.activeSpatialIntervals) this.activeSpatialIntervals = {};
+            if (!this.opponentSpazialeAreas) this.opponentSpazialeAreas = [];
 
-            // Se non c'è già un intervallo attivo per questa spell, crealo
-            if (!this.activeSpatialIntervals[spellId]) {
-                let ticks = 0;
-                this.activeSpatialIntervals[spellId] = setInterval(() => {
-                    const playerPos = this.gameHooks.virtualMouse;
-                    
-                    // Controlla se il player è dentro il poligono
-                    if (this.pointInPolygon(playerPos, data.polygonPoints)) {
-                        const damage = 5; // Danno per tick
-                        const healthBefore = this.gameHooks.playerHealth;
-                        this.gameHooks.playerHealth -= damage;
-                        const healthAfter = this.gameHooks.playerHealth;
-
-                        this.saveHealthToStorage();
-                        this.showDamageEffect(damage, true);
-
-                        console.log(`💥 [SPAZIALE][TICK] Player colpito da magia spaziale! Area: ${spellId} Tick: ${ticks} Danno: ${damage} | Vita: ${healthBefore} → ${healthAfter}`);
-
-                        if (this.gameHooks.playerHealth <= 0) {
-                            clearInterval(this.activeSpatialIntervals[spellId]);
-                            delete this.activeSpatialIntervals[spellId];
-                            this.endMatch(false);
-                        }
-                    } else {
-                        console.log(`[DEBUG] Player fuori dall'area spaziale ${spellId}. Pos: ${playerPos.x},${playerPos.y}`);
-                    }
-
-                    ticks++;
-                    // RIMUOVI IL LIMITE DI TEMPO
-                }, 500); // Ogni 500ms
+            // Controlla se l'area esiste già per evitare duplicati
+            if (this.activeSpatialIntervals[spellId]) {
+                console.log(`[DEBUG] Area spaziale avversaria ${spellId} già attiva.`);
+                return; // Esci se già presente
             }
+
+            this.opponentSpazialeAreas.push({
+                id: spellId,
+                points: data.polygonPoints,
+                color: data.color || '#ff6666', // Usa un colore standard per l'avversario
+                owner: 'opponent'
+            });
+            console.log(`[SPAZIALE] Aggiunta area avversaria ${spellId}, Totale: ${this.opponentSpazialeAreas.length}`);
+    
+            // Calcola il danno base in base all'area (simile a come fai per le tue aree)
+            const areaValue = this.calculatePolygonArea(data.polygonPoints);
+            const baseDamage = 0.5 * (areaValue / 700); // Usa la stessa formula del client
+            const damagePerTick = baseDamage; // Potrebbe essere scalato in base al livello
+    
+            let ticks = 0;
+            const maxTicks = 1000; // Limite opzionale per sicurezza
+    
+            this.activeSpatialIntervals[spellId] = setInterval(() => {
+                if (ticks >= maxTicks) {
+                    console.log(`[SPAZIALE][TICK] Limite tick raggiunto per area ${spellId}, fermando.`);
+                    clearInterval(this.activeSpatialIntervals[spellId]);
+                    delete this.activeSpatialIntervals[spellId];
+                    // Rimuovi anche dall'array locale se non lo fa handleOpponentSpellRemoval
+                    this.opponentSpazialeAreas = this.opponentSpazialeAreas.filter(area => area.id !== spellId);
+                    return;
+                }
+    
+                const playerPos = this.gameHooks.virtualMouse; // Usa la posizione del giocatore locale
+                if (playerPos && this.isPointInPolygon(playerPos, data.polygonPoints)) {
+                    const healthBefore = this.gameHooks.playerHealth;
+                    this.gameHooks.playerHealth -= damagePerTick;
+                    const healthAfter = this.gameHooks.playerHealth;
+                    this.showDamageEffect(damagePerTick, true);
+                    console.log(`💥 [SPAZIALE][TICK] Player colpito da magia spaziale avversaria! Area: ${spellId} Tick: ${ticks} Danno: ${damagePerTick}| Vita: ${healthBefore} → ${healthAfter}`);
+                    if (this.gameHooks.playerHealth <= 0) {
+                        clearInterval(this.activeSpatialIntervals[spellId]);
+                        delete this.activeSpatialIntervals[spellId];
+                        this.opponentSpazialeAreas = this.opponentSpazialeAreas.filter(area => area.id !== spellId);
+                        this.endMatch(false);
+                    }
+                } else {
+                     console.log(`[DEBUG] Player fuori dall'area spaziale avversaria ${spellId}. Pos: ${playerPos.x},${playerPos.y}`);
+                }
+                ticks++;
+            }, 500); // Ogni 500ms
+
         } else if (data.spellType && this.gameHooks.activeMagicParticles) {
             this.createOpponentSpellEffect(data);
         }
+    }
+
+    calculatePolygonArea(vertices) {
+        let area = 0;
+        let j = vertices.length - 1;
+
+        for (let i = 0; i < vertices.length; i++) {
+            area += (vertices[j].x + vertices[i].x) * (vertices[j].y - vertices[i].y);
+            j = i;
+        }
+
+        return Math.abs(area / 2);
+    }
+
+    isPointInPolygon(point, polygon) {
+        let inside = false;
+        for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+            if (((polygon[i].y > point.y) !== (polygon[j].y > point.y)) &&
+                (point.x < (polygon[j].x - polygon[i].x) * (point.y - polygon[i].y) / (polygon[j].y - polygon[i].y) + polygon[i].x)) {
+                inside = !inside;
+            }
+        }
+        return inside;
     }
 
     handleProjectileHit(data) {
@@ -982,19 +1014,54 @@ export class PvPManager {
      */
     renderPvPElements(ctx) {
         if (!this.isActive()) return;
-        
+    
         // Disegna avversario con la stessa grafica del player ma rosso
         this.drawOpponent(ctx);
-        
+    
         // Disegna cerchio magico avversario
         if (this.opponent.magicCircle) {
             this.drawOpponentMagicCircle(ctx);
         }
-        
+    
         // Disegna casting dell'avversario
         if (this.opponent.casting && this.opponent.castingPoints) {
             this.drawOpponentCasting(ctx);
         }
+    
+        // Disegna PROIETTILI avversari (se gestiti qui)
+        // this.drawOpponentProjectiles(ctx); // Se non gestiti altrove
+    
+        // *** AGGIUNGI QUESTA LINEA ***
+        this.drawOpponentSpazialeAreas(ctx);
+    }
+
+    drawOpponentSpazialeAreas(ctx) {
+        if (!this.opponentSpazialeAreas || this.opponentSpazialeAreas.length === 0) return;
+
+        ctx.save();
+        // Usa un colore diverso per distinguere le aree avversarie
+        const baseColor = 'rgba(255, 100, 100'; // Rosso per l'avversario
+        const alpha = 0.15; // Leggermente piu' trasparente?
+
+        for (const area of this.opponentSpazialeAreas) {
+            if (!area.points || area.points.length < 3) continue;
+
+            // Disegna il contorno
+            ctx.beginPath();
+            ctx.moveTo(area.points[0].x, area.points[0].y);
+            for (let i = 1; i < area.points.length; i++) {
+                ctx.lineTo(area.points[i].x, area.points[i].y);
+            }
+            ctx.closePath();
+            ctx.strokeStyle = baseColor + ', 0.6)'; // Contorno piu' visibile
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Disegna il riempimento
+            ctx.fillStyle = baseColor + `, ${alpha})`;
+            ctx.fill();
+        }
+        ctx.restore();
     }
 
     drawOpponent(ctx) {
@@ -1746,15 +1813,23 @@ export class PvPManager {
     }
 
     cleanupMatch() {
+        // Ferma tutti gli intervalli attivi per le aree spaziali avversarie
+        if (this.activeSpatialIntervals) {
+            for (const [id, interval] of Object.entries(this.activeSpatialIntervals)) {
+                clearInterval(interval);
+            }
+            this.activeSpatialIntervals = {};
+        }
+        // Pulisci l'array delle aree
+        this.opponentSpazialeAreas = [];
+    
         // Rimuovi dati della partita
         localStorage.removeItem('currentMatchData');
-        
         // Rimuovi dati di salute della partita
         if (this.healthPersistenceKey) {
             localStorage.removeItem(this.healthPersistenceKey);
             console.log('🗑️ Dati partita puliti');
         }
-        
         // Marca come disconnessione volontaria e disconnetti WebSocket
         this.intentionalDisconnect = true;
         if (this.ws) {
