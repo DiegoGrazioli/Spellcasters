@@ -29,6 +29,25 @@ function showHomeScreen(onSelect) {
         };
     }
 
+    // === Gestione volume audio ===
+    const audioVolumeSlider = document.getElementById('audio-volume');
+    const audioVolumeValue = document.getElementById('audio-volume-value');
+
+    if (audioVolumeSlider) {
+    // Leggi valore salvato (default 50)
+    const savedVolume = localStorage.getItem('audioVolume');
+    const initial = savedVolume ? parseInt(savedVolume) : 50;
+    audioVolumeSlider.value = initial;
+    if (audioVolumeValue) audioVolumeValue.textContent = `${initial}%`;
+
+    // Gestione evento
+    audioVolumeSlider.oninput = (e) => {
+        const val = parseInt(e.target.value);
+        if (audioVolumeValue) audioVolumeValue.textContent = `${val}%`;
+        localStorage.setItem('audioVolume', val);
+    };
+    }
+
     // === Foschia/nuvole animate stile Babylon.js - VERSIONE OTTIMIZZATA ===
     const fogCanvas = document.getElementById('home-fog-canvas');
     if (fogCanvas) {

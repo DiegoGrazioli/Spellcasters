@@ -8,6 +8,7 @@ import { Spark } from "./sparks.js";
 import { PvPManager } from "./pvp-manager.js";
 import { triggerCameraShake, applyCameraShake, updateRedOverlay, drawRedOverlay } from './damage-effects.js';
 import { statusEffectManager, applyElementalHit, updateStatusEffects } from "./status-effects.js";
+import { audioManager } from './audio-manager.js';
 
 const recognizer = new DollarRecognizer();
 
@@ -72,6 +73,9 @@ let isInPvPMatch = false;
 
 let playerLife = 100;
 
+let lastDrawSoundTime = 0;
+const DRAW_SOUND_THROTTLE = 100;
+
 function initializeGameMode() {
     const params = new URLSearchParams(window.location.search);
     gameMode = params.get('mode') || 'training';
@@ -89,6 +93,10 @@ function initializeGameMode() {
             window.location.href = 'game.html?mode=training';
         }
     }
+}
+
+async function initializeGame() {
+  await audioManager.loadAllSounds();
 }
 
 // === EVENTI CANVAS ===
@@ -118,6 +126,7 @@ canvas.addEventListener("mousedown", (e) => {
 });
 
 canvas.addEventListener("click", () => {
+  audioManager.resumeContext();
   canvas.requestPointerLock();
   canvas.focus();
 });
@@ -151,6 +160,13 @@ canvas.addEventListener("mousemove", (e) => {
     const point = { x: virtualMouse.x, y: virtualMouse.y };
     points.push(point);
     particles.push(createParticle(point.x, point.y));
+
+    const now = Date.now();
+    if (now - lastDrawSoundTime > DRAW_SOUND_THROTTLE) {
+      // Riproduce un suono di disegno casuale con volume basso
+      audioManager.playDrawingSound(0.3); 
+      lastDrawSoundTime = now;
+    }
     if (points.length > 5) {
       const partialResult = recognizer.recognize(points.slice(-10));
       if (partialResult.score > 0.5) {
@@ -172,6 +188,7 @@ canvas.addEventListener("mouseup", (e) => {
     // Usa la proiezione spaziale
     magicCircle.projections.pop(); // Consuma la carica
     activateSpazialeArea(spazialePolygonPoints, spazialePolygonColor);
+    audioManager.setSpatialSpellLoopPlaying(magicCircle.elemento, true);
     incrementaProiezioneUsataBuffer("spaziale");
     showDebugMessage(`Area SPAZIALE creata! Cariche rimanenti: ${magicCircle.projections.length}`);
     if (magicCircle.projections.length <= 0) {
@@ -203,39 +220,42 @@ window.addEventListener("keydown", (e) => {
   if ((e.key === "z" || e.key === "Z") && !casting) {
     casting = true;
     points = [];
+    // audioManager.playDrawingStartSound(); // Se vuoi un suono all'inizio
+    // audioManager.setDrawingLoopPlaying(true); // Se implementi un loop
   }
   if (e.key === 'n' || e.key === 'N') setTheme('night');
   if (e.key === 'g' || e.key === 'G') setTheme('day');
 
   // 🧪 TEST STATUS EFFECTS
-  if (e.key === '1') {
-    console.log("🔥 Testando effetto FUOCO");
-    if (typeof applyElementalHit !== 'undefined') {
-      applyElementalHit('fuoco', 'player');
-    }
-  }
-  if (e.key === '2') {
-    console.log("💧 Testando effetto ACQUA (rallentamento)");
-    if (typeof applyElementalHit !== 'undefined') {
-      applyElementalHit('acqua', 'player');
-    }
-  }
-  if (e.key === '3') {
-    console.log("💨 Testando effetto ARIA (inversione controlli)");
-    if (typeof applyElementalHit !== 'undefined') {
-      applyElementalHit('aria', 'player');
-    }
-  }
-  if (e.key === '4') {
-    console.log("🗿 Testando effetto TERRA (stun)");
-    if (typeof applyElementalHit !== 'undefined') {
-      applyElementalHit('terra', 'player');
-    }
-  }
+  // if (e.key === '1') {
+  //   console.log("🔥 Testando effetto FUOCO");
+  //   if (typeof applyElementalHit !== 'undefined') {
+  //     applyElementalHit('fuoco', 'player');
+  //   }
+  // }
+  // if (e.key === '2') {
+  //   console.log("💧 Testando effetto ACQUA (rallentamento)");
+  //   if (typeof applyElementalHit !== 'undefined') {
+  //     applyElementalHit('acqua', 'player');
+  //   }
+  // }
+  // if (e.key === '3') {
+  //   console.log("💨 Testando effetto ARIA (inversione controlli)");
+  //   if (typeof applyElementalHit !== 'undefined') {
+  //     applyElementalHit('aria', 'player');
+  //   }
+  // }
+  // if (e.key === '4') {
+  //   console.log("🗿 Testando effetto TERRA (stun)");
+  //   if (typeof applyElementalHit !== 'undefined') {
+  //     applyElementalHit('terra', 'player');
+  //   }
+  // }
 });
 
 window.addEventListener("keyup", (e) => {
   if (e.key === "z" || e.key === "Z") {
+    // audioManager.setDrawingLoopPlaying(false); // Se implementi un loop
     casting = false;
     recognizeSpell(points);
     points = [];
@@ -255,6 +275,12 @@ function simulateRightClick() {
   for (let i = permanentSpazialeAreas.length - 1; i >= 0; i--) {
     if (pointInPolygon({x: mx, y: my}, permanentSpazialeAreas[i].points)) {
       const removedArea = permanentSpazialeAreas[i];
+
+      if (removedArea && permanentSpazialeAreas[i].element) {
+        audioManager.setSpatialSpellLoopPlaying(permanentSpazialeAreas[i].element, false);
+      } else {
+        audioManager.setSpatialSpellLoopPlaying(null, false);
+      }
       permanentSpazialeAreas.splice(i, 1);
 
       if (pvpManager && pvpManager.isActive()) {
@@ -281,7 +307,7 @@ function simulateRightClick() {
   const dy = my - magicCircle.y;
   const dist = Math.hypot(dx, dy);
   if (dist >= magicCircle.radius - 120 && dist <= magicCircle.radius) {
-    // NUOVA LOGICA: Cancellazione manuale - rimuove anche le aree spaziali
+    // Cancellazione manuale - rimuove anche le aree spaziali
     if (pvpManager && pvpManager.isActive() && permanentSpazialeAreas.length > 0) {
       // Notifica la rimozione di tutte le aree spaziali
       for (const area of permanentSpazialeAreas) {
@@ -624,6 +650,7 @@ function launchProjectile(start, end, colorOverride, tipoProiezione = "proiettil
   incrementaProiezioneUsataBuffer("proiettile");
   proiettileExpToAdd += 2;
   console.log("🎯 Esperienza proiettile aggiunta:", 2);
+  audioManager.playProjectileSound(projectile.element);
 }
 
 function updateProjectiles() {
@@ -677,6 +704,7 @@ function triggerMagicCircleAction(start, end) {
   if (magicCircle.elemento && (!magicCircle.projections || magicCircle.projections.length === 0)) {
     showEffect(magicCircle.elemento, magicCircle.x, magicCircle.y);
     incrementaAffinitaBuffer(magicCircle.elemento);
+    audioManager.playElementSpellSound(magicCircle.elemento);
   }
   // Solo proiezione
   else if ((!magicCircle.elemento || magicCircle.elemento === null) && magicCircle.projections && magicCircle.projections.length > 0 && start && end) {
@@ -792,6 +820,7 @@ function recognizeSpell(points) {
       showEffect(result.name);
       incrementaAffinitaBuffer(result.name);
       spendMana(1);
+      audioManager.playElementSpellSound(result.name);
     } else {
       showEffect(result.name);
     }
@@ -1001,6 +1030,11 @@ function incrementaProiezioneUsataBuffer(tipo, valore = 1) {
   proiezioniToAdd[tipo] = (proiezioniToAdd[tipo] || 0) + valore;
 }
 
+function updateAudioState() {
+  // Modifica la logica per dipendere solo dall'esistenza del cerchio magico
+  audioManager.setMagicCircleLoopPlaying(!!magicCircle);
+}
+
 // === ANIMATE LOOP ===
 export function animate() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -1042,6 +1076,7 @@ export function animate() {
   drawCollisionSparks(ctx);
 
   drawMagicCircle();
+  updateAudioState();
   drawLastProjectileParticles();
   updateProjectiles();
   drawProjectiles();
@@ -1087,7 +1122,7 @@ export function animate() {
           });
         }
       }
-      
+      audioManager.setSpatialSpellLoopPlaying(null, false);
       permanentSpazialeAreas = [];
       showDebugMessage("Mana esaurito! Tutte le aree spaziali sono svanite.");
       triggerBurnout();
@@ -1249,10 +1284,13 @@ function activateSpazialeArea(points, color) {
 
   const areaId = `area_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
+  const element = magicCircle?.elemento || getElementFromColor(color) || 'spaziale';
+
   permanentSpazialeAreas.push({ 
     id: areaId, // AGGIUNGI QUESTO
     points: points.map(p => ({...p})), 
     color, 
+    element: element,
     manaDrain, 
     affinityTimer: 0 
   });
@@ -1270,6 +1308,7 @@ function activateSpazialeArea(points, color) {
       position: { x: centerX, y: centerY },
       polygonPoints: points,
       element: 'spaziale',
+      element: element,
       areaId: areaId // Includi l'ID dell'area
     });
 
@@ -1278,6 +1317,7 @@ function activateSpazialeArea(points, color) {
       position: { x: centerX, y: centerY },
       polygonPoints: points,
       element: 'spaziale',
+      element: element,
       areaId: areaId // Includi l'ID dell'area
     });
   }
@@ -1358,20 +1398,38 @@ function polygonArea(points) {
 
 function getElementFromColor(color) {
   const colorMap = {
-    '#ff5555': 'fuoco',
-    '#5555ff': 'acqua',
-    '#aaaaee': 'aria',
-    '#55aa55': 'terra',
-    '#ffff55': 'fulmine',
-    '#ffffff': 'luce'
+    '#ff5555': 'fuoco',   // getElementColor('fuoco')
+    '#5555ff': 'acqua',   // getElementColor('acqua')
+    '#55ff55': 'aria',    // getElementColor('aria')
+    '#aa8844': 'terra',   // getElementColor('terra')
+    '#00e0ff': 'spaziale' // Colore di default per spaziale
+    // Aggiungi altri mapping se necessario
   };
-  // Cerca una corrispondenza esatta
-  if (colorMap[color]) return colorMap[color];
-  // Oppure cerca una corrispondenza parziale (per rgba)
-  for (const [hex, el] of Object.entries(colorMap)) {
-    if (color.includes(hex.slice(1))) return el;
+  // Converte il colore in formato standardizzato per il confronto
+  // Es: '#RRGGBB' o 'rgb(R, G, B)' -> '#rrggbb'
+  let normalizedColor = color.toLowerCase();
+  if (normalizedColor.startsWith('rgba')) {
+    // Estrae R, G, B da rgba(r, g, b, a)
+    const match = normalizedColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+    if (match) {
+      const r = parseInt(match[1]).toString(16).padStart(2, '0');
+      const g = parseInt(match[2]).toString(16).padStart(2, '0');
+      const b = parseInt(match[3]).toString(16).padStart(2, '0');
+      normalizedColor = `#${r}${g}${b}`;
+    }
+  } else if (normalizedColor.startsWith('rgb')) {
+    // Estrae R, G, B da rgb(r, g, b)
+    const match = normalizedColor.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+    if (match) {
+      const r = parseInt(match[1]).toString(16).padStart(2, '0');
+      const g = parseInt(match[2]).toString(16).padStart(2, '0');
+      const b = parseInt(match[3]).toString(16).padStart(2, '0');
+      normalizedColor = `#${r}${g}${b}`;
+    }
   }
-  return null;
+  // Rimuovi alpha se presente nei colori noti
+  const baseColor = normalizedColor.replace(/[\da-f]{2}$/, '');
+  return colorMap[baseColor] || null;
 }
 
 function updateVirtualMouse() {
@@ -1479,7 +1537,17 @@ function createCollisionSparks(x, y, entity1, entity2, collision, impactForce) {
     collisionSparks.push(spark);
   }
   
+  const MIN_VOLUME = 0.1; // Volume minimo per un impatto leggero
+  const MAX_VOLUME = 0.9; // Volume massimo per un impatto forte
+
+  const MAX_IMPACT_FOR_VOLUME = 25.0;
+
+  const normalizedImpact = Math.min(1.0, totalImpact / MAX_IMPACT_FOR_VOLUME);
+
+  const impactVolume = MIN_VOLUME + (normalizedImpact * (MAX_VOLUME - MIN_VOLUME));
+
   console.log(`Created ${sparkCount} sparks for collision with impact: ${totalImpact.toFixed(2)}`);
+  audioManager.playCollisionSound(impactVolume);
 }
 
 // Funzione per aggiornare tutte le scintille
@@ -1500,5 +1568,6 @@ function drawCollisionSparks(ctx) {
 }
 
 initializeGameMode();
+initializeGame();
 updateStatusEffects(1 / 60);
 animate();
