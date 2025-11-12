@@ -388,7 +388,8 @@ function drawMagicParticles() {
     const p = activeMagicParticles[i];
     ctx.beginPath();
     ctx.arc(p.x, p.y, p.radius, 0, 2 * Math.PI);
-    ctx.fillStyle = p.color + p.alpha + ")";
+    p.color = ensureRGBA(p.color, p.alpha);
+    ctx.fillStyle = p.color;
     ctx.fill();
     p.x += p.dx;
     p.y += p.dy;
@@ -1278,6 +1279,18 @@ function drawSpazialePolygon() {
   }
 }
 
+function ensureRGBA(color, alpha = 1) {
+  if (color.startsWith("rgba")) return color;
+  if (color.startsWith("#")) {
+    const r = parseInt(color.slice(1, 3), 16);
+    const g = parseInt(color.slice(3, 5), 16);
+    const b = parseInt(color.slice(5, 7), 16);
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+  // fallback generico
+  return `rgba(0,224,255,${alpha})`;
+}
+
 function activateSpazialeArea(points, color) {
   const area = polygonArea(points);
   const manaDrain = Math.max(0.01, area / 10000 * 0.01);
@@ -1287,7 +1300,7 @@ function activateSpazialeArea(points, color) {
   const element = magicCircle?.elemento || getElementFromColor(color) || 'spaziale';
 
   permanentSpazialeAreas.push({ 
-    id: areaId, // AGGIUNGI QUESTO
+    id: areaId,
     points: points.map(p => ({...p})), 
     color, 
     element: element,
@@ -1336,20 +1349,25 @@ function activateSpazialeArea(points, color) {
   ctx.globalAlpha = 1;
   ctx.restore();
 
+  const baseColor = ensureRGBA(color, 1);
+
   // Particelle magiche lungo il bordo
   for (let i = 0; i < points.length - 1; i++) {
     const p1 = points[i], p2 = points[i + 1];
     for (let t = 0; t < 1; t += 0.1) {
       const x = p1.x + (p2.x - p1.x) * t;
       const y = p1.y + (p2.y - p1.y) * t;
+      const alpha = 0.5 + Math.random() * 0.3;
+      const particleColor = ensureRGBA(color, alpha);
       activeMagicParticles.push({
         x, y,
         radius: Math.random() * 2 + 1,
         alpha: 0.5 + Math.random() * 0.3,
         dx: (Math.random() - 0.5) * 0.5,
         dy: (Math.random() - 0.5) * 0.5,
-        color: color.replace("1)", "0.7)").replace(")", ",")
+        color: particleColor.replace(/\)$/,"") + ","
       });
+
     }
   }
   incrementaAffinitaBuffer("spaziale");
@@ -1372,6 +1390,25 @@ function drawPermanentSpazialeAreas() {
     ctx.lineWidth = 2;
     ctx.stroke();
     ctx.restore();
+
+    if (Math.random() < 0.05) { // 5% per frame
+      const edgeIndex = Math.floor(Math.random() * (area.points.length - 1));
+      const p1 = area.points[edgeIndex];
+      const p2 = area.points[edgeIndex + 1];
+      const t = Math.random();
+      const x = p1.x + (p2.x - p1.x) * t;
+      const y = p1.y + (p2.y - p1.y) * t;
+      const alpha = 0.4 + Math.random() * 0.3;
+      const color = ensureRGBA(area.color, alpha).replace(/\)$/,"") + ",";
+      activeMagicParticles.push({
+        x, y,
+        radius: Math.random() * 1.5 + 0.5,
+        alpha,
+        dx: (Math.random() - 0.5) * 0.5,
+        dy: (Math.random() - 0.5) * 0.5,
+        color
+      });
+    }
   }
 }
 
