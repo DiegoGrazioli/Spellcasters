@@ -22,6 +22,10 @@ if (!admin.apps.length) {
     });
 }
 
+const dbAdmin = admin.firestore();
+
+export { dbAdmin };
+
 const port = process.env.PORT || 8080;
 const wss = new WebSocketServer({ port });
 
@@ -37,12 +41,6 @@ const MATCHMAKING_CONFIG = {
     QUEUE_TIMEOUT: 30000, // 30 secondi prima di espandere i criteri
     MATCH_TIMEOUT: 300000 // 5 minuti per partita
 };
-
-admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount)
-});
-
-const dbAdmin = admin.firestore();
 
 wss.on('connection', (ws) => {
     console.log('🔌 Nuovo giocatore connesso');
