@@ -41,6 +41,7 @@ let magicCircleDragEnd = null;
 
 let particleCount = Number(localStorage.getItem('particleCount')) || 60;
 
+let isLaunchingProjectile = false;
 let isDrawingSpaziale = false;
 let spazialePolygonPoints = [];
 let spazialePolygonColor = "#00e0ff";
@@ -266,6 +267,50 @@ window.addEventListener("keyup", (e) => {
     simulateRightClick();
   }
 });
+
+document.addEventListener('pointerlockchange', pointerLockChangeHandler, false);
+// document.addEventListener('mozpointerlockchange', pointerLockChangeHandler, false); // per compatibilità
+
+function pointerLockChangeHandler() {
+  if (document.pointerLockElement === canvas || document.mozPointerLockElement === canvas) {
+      // Pointer Lock ATTIVO (il giocatore è rientrato nel gioco)
+      
+      // **IMPORTANTE:** Esegui il reset dello stato di casting.
+      // Questo impedisce al click di rientro di attivare un cerchio magico.
+      resetCastingState(); 
+      
+      // Puoi anche rimettere in pausa/riprendere la musica qui, se necessario
+      // audioManager.resumeContext(); 
+  } else {
+      // Pointer Lock DISATTIVATO (il giocatore ha premuto ESC)
+      
+      // Esegui il reset anche qui, per pulire prima di uscire
+      resetCastingState(); 
+      
+      // Mettere in pausa la logica di gioco, se necessario (es. con una variabile `isPaused`)
+  }
+}
+
+function resetCastingState() {
+  // Variabili principali di casting
+  casting = false;
+  points = []; // Punti del gesto
+  
+  // Variabili per il lancio di proiettili/spaziale
+  // (Presumo che queste siano le variabili che usi per i due stati che hai descritto)
+  isLaunchingProjectile = false; // Aggiungi questa variabile se non è già globale
+  magicCircle = null; // Rimuove il cerchio magico dal disegno
+  
+  // Rimuove eventuali entità di mouse virtuale create dal cerchio magico
+  if (pvpManager && pvpManager.gameHooks.virtualMouse) {
+      pvpManager.gameHooks.virtualMouse.isActive = false;
+      // Inoltre, se è in corso un'attivazione spaziale o proiettile, resetta i punti
+      activeMagicParticles = []; 
+      fireParticles = []; // o qualsiasi particella associata
+  }
+  
+  console.log("🧹 Stato di casting resettato a causa di cambio Pointer Lock.");
+}
 
 function simulateRightClick() {
   const mx = virtualMouse.x;
