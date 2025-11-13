@@ -4,6 +4,7 @@
   "type": "module",
   "dependencies": {
     "firebase": "^11.9.1",
+    "firebase-admin": "^13.6.0",
     "uuid": "^11.1.0",
     "ws": "^8.18.2"
   },

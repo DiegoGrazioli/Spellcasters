@@ -9,23 +9,43 @@
 </head>
 <body>
   <button id="home-btn" class="main-btn">Home</button>
-  <div id="arena-container">
-    <h1 id="arena-title">Arena Multiplayer</h1>
-    <div id="matchmaking-status">
-      <p id="status-message">In attesa di avversari...</p>
-      <button id="matchmaking-btn" class="main-btn">Ricerca</button>
-    </div>
-    <div id="player-info">
-      <h2>Informazioni Giocatore</h2>
-      <p id="player-name">Nome: <span id="name-value">Giocatore</span></p>
-      <p id="player-level">Livello: <span id="level-value">1</span></p>
-    </div>
-    <div id="online-status">
-      <p>Giocatori online: <span id="online-players-count">0</span></p>
-    </div>
-    <div id="arena-actions">
-      <button id="training-btn" class="main-btn">Training</button>
-    </div>
+  
+  <button id="open-leaderboard-btn" class="slide-btn right-btn">
+      Classifica
+  </button>
+  
+  <div id="main-view-wrapper"> 
+      
+      <div id="arena-container">
+          <h1 id="arena-title">Arena Multiplayer</h1>
+          <div id="matchmaking-status">
+            <p id="status-message">In attesa di avversari...</p>
+            <button id="matchmaking-btn" class="main-btn">Ricerca</button>
+          </div>
+          <div id="player-info">
+            <h2>Informazioni Giocatore</h2>
+            <p id="player-name">Nome: <span id="name-value">Giocatore</span></p>
+            <p id="player-level">Livello: <span id="level-value">1</span></p>
+          </div>
+          <div id="online-status">
+            <p>Giocatori online: <span id="online-players-count">0</span></p>
+            <p style="text-align: center;">In coda: <span id="ready-players-count">0</span></p>
+          </div>
+          <div id="arena-actions">
+            <button id="training-btn" class="main-btn">Training</button>
+          </div>
+      </div>
+
+      <div id="leaderboard-panel">
+          <button id="close-leaderboard-btn" class="slide-btn left-btn">
+              Arena
+          </button>
+          <h2 id="arena-title">Classifica PvP Globale</h2>
+          <p>(Minimo 10 Partite Giocate)</p>
+          <div id="leaderboard-list">
+              <p>Caricamento dati...</p> </div>
+      </div>
+      
   </div>
   <script type="module" src="./arena.js"></script>
 </body>

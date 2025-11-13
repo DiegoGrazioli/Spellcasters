@@ -2,6 +2,13 @@
 import { WebSocketServer } from 'ws';
 import { v4 as uuidv4 } from 'uuid';
 
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const serviceAccount = require('./serviceAccountKey.json');
+
+import admin from 'firebase-admin';
+
+
 const port = process.env.PORT || 8080;
 const wss = new WebSocketServer({ port });
 
@@ -17,6 +24,12 @@ const MATCHMAKING_CONFIG = {
     QUEUE_TIMEOUT: 30000, // 30 secondi prima di espandere i criteri
     MATCH_TIMEOUT: 300000 // 5 minuti per partita
 };
+
+admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+});
+
+const dbAdmin = admin.firestore();
 
 wss.on('connection', (ws) => {
     console.log('🔌 Nuovo giocatore connesso');
@@ -77,9 +90,23 @@ function handleMessage(ws, data) {
             break;
         case 'playerReady':
             handlePlayerReady(ws, data);
+            break;
+        case 'requestLeaderboard':
+            sendLeaderboard(ws);
+            break;
         default:
             console.log('🤔 Tipo messaggio sconosciuto:', data.type);
     }
+}
+
+async function getAllPlayersFromDB() {
+    // Questa implementazione è concettuale e DEVE usare il Firebase Admin SDK
+    const snapshot = await dbAdmin.collection('players').get();
+    const players = [];
+    snapshot.forEach(doc => {
+        players.push(doc.data());
+    });
+    return players;
 }
 
 function handlePlayerReady(ws, data) {
@@ -719,6 +746,55 @@ setInterval(() => {
 
 function calculateWinRate(vittorie, partite) {
     return partite > 0 ? (vittorie / partite) : 0;
+}
+
+async function sendLeaderboard(ws) {
+    const MIN_MATCHES_FOR_LEADERBOARD = 10; 
+
+    console.log('Fetching ALL players from Firestore for leaderboard...');
+    
+    // 1. Fetch di TUTTI i giocatori dal database
+    let allPlayers;
+    try {
+        allPlayers = await getAllPlayersFromDB(); 
+    } catch (error) {
+        console.error('❌ Errore nel fetch di tutti i giocatori dal DB Admin:', error);
+        ws.send(JSON.stringify({ type: 'matchmakingError', message: 'Errore interno del server (DB).' }));
+        return;
+    }
+
+    // 2. Calcolo Win Rate, filtro per partite giocate e ordinamento
+    const leaderboardData = allPlayers
+        .map(p => {
+            const partite = p.partite || 0;
+            const vittorie = p.vittorie || 0;
+            return {
+                username: p.username,
+                level: p.livello || 1, // Assumi 'livello' dal DB
+                vittorie: vittorie,
+                partite: partite,
+                // Calcola il winRate *al volo*
+                winRate: partite > 0 ? vittorie / partite : 0 
+            };
+        })
+        .filter(p => p.partite >= MIN_MATCHES_FOR_LEADERBOARD)
+        .sort((a, b) => b.winRate - a.winRate) // Ordine decrescente di WinRate
+        .slice(0, 50); // Top 50
+
+    // 3. Invio dei dati al client
+    const simplifiedLeaderboard = leaderboardData.map(p => ({
+        username: p.username,
+        level: p.level,
+        winRate: p.winRate, // Già calcolato in p
+        vittorie: p.vittorie,
+        partite: p.partite
+    }));
+
+    ws.send(JSON.stringify({
+        type: 'leaderboardData',
+        leaderboard: simplifiedLeaderboard
+    }));
+    console.log(`📊 Leaderboard globale inviata a un client (${leaderboardData.length} giocatori idonei).`);
 }
 
 console.log(`🚀 Server WebSocket avviato sulla porta ${port}`);

@@ -15,17 +15,40 @@ class ArenaManager {
     }
 
     async initializeUI() {
-        // Carica dati giocatore
+        // 1. Verifica l'username in localStorage
         const username = localStorage.getItem('currentPlayer');
+        
         if (username) {
-            this.playerData = await getPlayerData(username);
-            if (this.playerData) {
-                document.getElementById('name-value').textContent = this.playerData.username;
-                document.getElementById('level-value').textContent = this.playerData.livello || 1;
+            console.log(`👤 Trovato utente in localStorage: ${username}. Tentativo di fetch da Firebase...`);
+            this.updateStatusMessage(`Caricamento dati per ${username}...`);
+
+            try { 
+                // 2. Tenta di recuperare i dati dal DB
+                this.playerData = await getPlayerData(username);
                 
-                // Mostra statistiche se disponibili
-                this.updatePlayerStats();
+                if (this.playerData) {
+                    // 3. Successo: i dati sono stati caricati
+                    console.log('✅ Dati utente caricati con successo:', this.playerData);
+                    document.getElementById('name-value').textContent = this.playerData.username;
+                    document.getElementById('level-value').textContent = this.playerData.livello || 1;
+                    
+                    this.updatePlayerStats();
+                    this.updateStatusMessage('Dati utente caricati. Connessione al server...');
+                } else {
+                    // 4. Utente non trovato nel DB
+                    console.error(`❌ ERRORE: Nessun documento trovato in Firestore per l'utente "${username}".`);
+                    this.updateStatusMessage(`Utente non trovato nel database! Accesso necessario.`);
+                    // Potresti aggiungere qui una logica per reindirizzare l'utente
+                }
+            } catch (error) {
+                // 5. Errore di connessione o autenticazione Firebase
+                console.error('❌ ERRORE CRITICO nel recupero dati utente (Firebase/player-db.js):', error);
+                this.updateStatusMessage('Errore di connessione al database. Controlla la Console.');
             }
+        } else {
+             // 6. Username mancante in localStorage
+             console.error('❌ ERRORE: Chiave "currentPlayer" mancante in localStorage.');
+             this.updateStatusMessage('Accesso non effettuato. Ritorna alla Home per accedere.');
         }
 
         // Setup event listeners
@@ -78,6 +101,14 @@ class ArenaManager {
             window.location.href = 'game.html?mode=training';
         });
 
+        document.getElementById('open-leaderboard-btn').addEventListener('click', () => {
+            this.showLeaderboard();
+        });
+
+        document.getElementById('close-leaderboard-btn').addEventListener('click', () => {
+            this.hideLeaderboard();
+        });
+
         // Scorciatoie tastiera
         window.addEventListener('keydown', (e) => {
             if (e.key === 'n' || e.key === 'N') this.setArenaTheme('night');
@@ -94,8 +125,8 @@ class ArenaManager {
     }
 
     connectToServer() {
-        const wsUrl = 'wss://spellcasters.onrender.com'; // O localhost per development
-        // const wsUrl = 'ws://localhost:8080'; // Cambia con il tuo server WebSocket
+        // const wsUrl = 'wss://spellcasters.onrender.com'; // O localhost per development
+        const wsUrl = 'ws://localhost:8080'; // Cambia con il tuo server WebSocket
         
         try {
             this.ws = new WebSocket(wsUrl);
@@ -202,6 +233,10 @@ class ArenaManager {
             case 'playerCounts':
                 this.updateOnlineCount(data.totalOnline);
                 this.updateReadyCount(data.playersReady);
+                break;
+
+            case 'leaderboardData':
+                this.renderLeaderboard(data.leaderboard);
                 break;
 
             default:
@@ -360,6 +395,87 @@ class ArenaManager {
     initArenaTheme() {
         const saved = localStorage.getItem('mode');
         this.setArenaTheme(saved === 'night' ? 'night' : 'day');
+    }
+
+    showLeaderboard() {
+        if (!this.isConnected) {
+            this.updateStatusMessage('Non connesso al server per la classifica.');
+            return;
+        }
+        // Attiva la classe CSS che sposta la visualizzazione
+        document.body.classList.add('show-leaderboard');
+        
+        // Richiedi i dati aggiornati al server
+        if (this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify({ type: 'requestLeaderboard' }));
+            console.log("📤 Richiesta leaderboard inviata");
+        } else {
+            console.warn("⚠️ WebSocket non ancora aperto, riprovo tra un attimo...");
+            setTimeout(() => this.requestLeaderboard(), 300);
+        }
+        this.updateStatusMessage('Caricamento classifica PvP...');
+    }
+
+    hideLeaderboard() {
+        // Rimuove la classe CSS per tornare alla vista principale
+        document.body.classList.remove('show-leaderboard');
+    }
+
+    renderLeaderboard(leaderboard) {
+        const listContainer = document.getElementById('leaderboard-list');
+        if (!listContainer) return;
+        
+        listContainer.innerHTML = ''; // Pulisci la lista precedente
+        this.updateStatusMessage('Classifica aggiornata');
+
+        if (leaderboard.length === 0) {
+            listContainer.innerHTML = '<p>Ancora nessun giocatore idoneo in classifica.</p>';
+            return;
+        }
+
+        const ul = document.createElement('ul');
+        ul.className = 'leaderboard-list';
+        
+        ul.innerHTML = `
+            <li class="header">
+                <span class="rank">#</span>
+                <span class="name">Giocatore</span>
+                <span class="winrate">Win Rate</span>
+                <span class="wins">Vittorie</span>
+                <span class="matches">Partite</span>
+            </li>
+        `;
+        
+        leaderboard.forEach((player, index) => {
+            const li = document.createElement('li');
+            const winRatePercent = (player.winRate * 100).toFixed(1);
+        
+            li.innerHTML = `
+                <span class="rank">#${index + 1}</span>
+                <span class="name">${player.username} (Liv. ${player.level})</span>
+                <span class="winrate">${winRatePercent}%</span>
+                <span class="wins">${player.vittorie || 0}</span>
+                <span class="matches">${player.partite}</span>
+            `;
+        
+            // Evidenzia il proprio record
+            if (this.playerData && this.playerData.username === player.username) {
+                li.classList.add('my-rank');
+            }
+        
+            // Colorazioni per i primi 3
+            if (index === 0) {
+                li.classList.add('gold-rank'); // Dorato
+            } else if (index === 1) {
+                li.classList.add('silver-rank'); // Argento
+            } else if (index === 2) {
+                li.classList.add('bronze-rank'); // Bronzo
+            }
+        
+            ul.appendChild(li);
+        });
+
+        listContainer.appendChild(ul);
     }
 }
 

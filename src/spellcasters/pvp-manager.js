@@ -477,8 +477,8 @@ export class PvPManager {
     }
 
     connectToGameServer() {
-        const wsUrl = 'ws://localhost:8080'; // Usa server locale per debugging
-        // const wsUrl = 'wss://spellcasters.onrender.com'; // Usa server remoto per produzione
+        // const wsUrl = 'ws://localhost:8080'; // Usa server locale per debugging
+        const wsUrl = 'wss://spellcasters.onrender.com'; // Usa server remoto per produzione
         
         try {
             this.ws = new WebSocket(wsUrl);

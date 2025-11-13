@@ -143,3 +143,169 @@ body.night #online-players-count {
   padding: 10px 22px;
   font-size: 1em;
 }
+
+/* Container principale che abilita lo scorrimento laterale */
+#main-view-wrapper {
+  display: flex; 
+  width: 200vw; /* Due viste affiancate */
+  height: 100vh;
+  transition: transform 0.5s ease-in-out; /* Animazione fluida */
+  position: fixed;
+  top: 0;
+  left: 0;
+  overflow: hidden;
+}
+
+/* Stato spostato: mostra la classifica */
+body.show-leaderboard #main-view-wrapper {
+  /* Sposta l'intero wrapper di 100vw (una schermata) a sinistra per mostrare la seconda vista */
+  transform: translateX(-100vw); 
+}
+
+/* Le due viste devono occupare esattamente metà dello schermo */
+#arena-container, 
+#leaderboard-panel {
+    width: 100vw; /* Ora occupa tutto lo schermo */
+    min-height: 100vh;
+    padding: 100px;
+    box-sizing: border-box;
+    /* Aggiungi uno sfondo specifico per la classifica */
+    /* background-color: var(--background-color, #1a1a1a);  */
+    color: var(--text-color, #ffffff);
+}
+
+#leaderboard-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* Centra il contenuto orizzontalmente */
+  justify-content: flex-start;
+  overflow-y: auto;
+  width: 100vw;
+  padding: 20px 40px;
+}
+
+/* Stili per i pulsanti di slide */
+.slide-btn {
+  position: fixed;
+  z-index: 100; /* Assicurati che sia sopra tutto */
+  /* centra verticalmente */
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 220px;
+  border: none;
+  cursor: pointer;
+  color: white;
+  font-weight: bold;
+  /* Rendi il testo verticale ruotando l'intero pulsante */
+  writing-mode: vertical-lr; 
+  text-orientation: mixed;
+  padding: 10px 5px;
+  border-radius: 5px 5px 0 0;
+  /* transform: translateY(-50%); */
+  transition: background 0.2s ease;
+}
+
+.slide-btn:hover {
+  transform: translateY(-50%);
+}
+
+/* Pulsante a destra per aprire */
+.right-btn {
+  right: 0; 
+  border-radius: 0 0 5px 5px;
+}
+
+/* Pulsante a sinistra per chiudere */
+.left-btn {
+  right: 0;
+  border-radius: 5px 5px 0 0;
+}
+
+/* Visibilità dei pulsanti */
+body.show-leaderboard #open-leaderboard-btn {
+  display: none;
+}
+body:not(.show-leaderboard) #close-leaderboard-btn {
+  display: none;
+}
+
+/* Stili per la lista della classifica */
+.leaderboard-list {
+  list-style: none;
+  padding: 0;
+  margin-top: 150px;
+  width: 60vw; /* Occupa l'80% della larghezza centrata */
+  max-width: none;
+  text-align: center;
+}
+
+.leaderboard-list li {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 1.1em;
+}
+
+.leaderboard-list li.header {
+  color: var(--text-color);
+  font-weight: bold;
+  border-bottom: 2px solid var(--home-title-color, #4f8cff);
+  padding-bottom: 15px;
+  text-transform: uppercase;
+}
+
+/* Stili per le medaglie */
+.leaderboard-list li.gold-rank {
+  color: gold;
+}
+
+.leaderboard-list li.silver-rank {
+  color: silver;
+}
+
+.leaderboard-list li.bronze-rank {
+  color: #cd7f32; 
+}
+
+/* Assicurati che il rank abbia il colore giusto anche nei primi 3 */
+.leaderboard-list li:is(.gold-rank, .silver-rank, .bronze-rank) .rank {
+  color: inherit; /* Usa il colore del genitore (gold, silver, bronze) */
+}
+
+.leaderboard-list li .rank {
+  font-weight: bold;
+  width: 10%;
+  text-align: left;
+  padding-left: 10px;
+}
+
+.leaderboard-list li .name {
+  width: 35%;
+  text-align: left;
+}
+
+.leaderboard-list li .winrate {
+  width: 25%; /* Spazio per Punti */
+  font-weight: bold;
+  text-align: center; /* Centra il numero */
+}
+
+.leaderboard-list li .wins {
+  width: 20%; /* Spazio per Vittorie */
+  font-weight: bold;
+  text-align: center; /* Centra il numero */
+}
+
+.leaderboard-list li .matches {
+  width: 20%; /* Spazio per Partite */
+  font-weight: bold;
+  text-align: center; /* Centra il numero */
+}
+
+.leaderboard-list li.my-rank {
+  background: rgba(var(--main-color-rgb, 0, 123, 255), 0.2); 
+  border: 1px solid var(--main-color, #4f8cff);
+  border-radius: 5px;
+}

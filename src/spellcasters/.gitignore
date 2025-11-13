@@ -29,6 +29,8 @@ firebase-debug.log
 *.sln
 *.sw?
 
+serviceAccountKey.json
+
 # Optional: ignore .env if using Firebase config
 .env
 .env.*
