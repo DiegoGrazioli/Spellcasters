@@ -401,7 +401,7 @@ function joinMatchmaking(ws, playerData) {
     console.log(`🔍 ${player.username} si è unito al matchmaking`);
     
     // Prova a trovare una partita
-    attemptMatchmaking();
+    // attemptMatchmaking();
 }
 
 function leaveMatchmaking(ws) {
@@ -422,25 +422,43 @@ function leaveMatchmaking(ws) {
 }
 
 function attemptMatchmaking() {
-    if (matchmakingQueue.length < 2) return;
+    // Continua a ciclare finché ci sono almeno due giocatori in coda
+    // e si può creare un match
+    let matchesCreated = 0;
+    let madeMatchInCycle = true;
 
-    for (let i = 0; i < matchmakingQueue.length - 1; i++) {
-        const player1 = matchmakingQueue[i];
+    // Questa logica assicura che lo scandaglio riparta dall'inizio
+    // della coda aggiornata dopo ogni creazione di match.
+    while (madeMatchInCycle && matchmakingQueue.length >= 2) {
+        madeMatchInCycle = false;
         
-        for (let j = i + 1; j < matchmakingQueue.length; j++) {
-            const player2 = matchmakingQueue[j];
+        for (let i = 0; i < matchmakingQueue.length - 1; i++) {
+            const player1 = matchmakingQueue[i];
             
-            if (isValidMatch(player1, player2)) {
-                createMatch(player1, player2);
+            for (let j = i + 1; j < matchmakingQueue.length; j++) {
+                const player2 = matchmakingQueue[j];
                 
-                // Rimuovi i giocatori dalla coda
-                matchmakingQueue.splice(j, 1); // Rimuovi il secondo per primo (indice più alto)
-                matchmakingQueue.splice(i, 1);
-                
-                console.log(`⚔️ Match creato: ${player1.username} vs ${player2.username}`);
-                return; // Esci dopo aver creato una partita
+                if (isValidMatch(player1, player2)) {
+                    createMatch(player1, player2);
+                    
+                    // Rimuovi i giocatori dalla coda
+                    // Importante: rimuovi prima l'indice più alto (j)
+                    matchmakingQueue.splice(j, 1); 
+                    matchmakingQueue.splice(i, 1);
+                    
+                    console.log(`⚔️ Match creato: ${player1.username} vs ${player2.username}`);
+                    
+                    matchesCreated++;
+                    madeMatchInCycle = true; // Forziamo il loop a ripartire dall'inizio della coda aggiornata
+                    break; // Esci dal loop interno (j) e riparti con un nuovo ciclo 'while'
+                }
             }
+            if (madeMatchInCycle) break; // Esci anche dal loop esterno (i) per ripartire
         }
+    }
+
+    if (matchesCreated > 0) {
+        console.log(`✅ Ciclo di matchmaking completato: creati ${matchesCreated} match.`);
     }
 }
 
@@ -691,6 +709,13 @@ setInterval(() => {
         }
     });
 }, 60000); // Ogni minuto
+
+const MATCHMAKING_INTERVAL_MS = 3000;
+
+setInterval(() => {
+    // Questo è il cuore del matchmaking, eseguito regolarmente
+    attemptMatchmaking(); 
+}, MATCHMAKING_INTERVAL_MS);
 
 function calculateWinRate(vittorie, partite) {
     return partite > 0 ? (vittorie / partite) : 0;
