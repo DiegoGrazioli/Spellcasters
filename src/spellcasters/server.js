@@ -4,10 +4,23 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
-const serviceAccount = require('./serviceAccountKey.json');
 
 import admin from 'firebase-admin';
+import fs from "fs";
 
+let serviceAccount;
+
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+} else {
+    serviceAccount = JSON.parse(fs.readFileSync("./serviceAccountKey.json", "utf8"));
+}
+
+if (!admin.apps.length) {
+    admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount)
+    });
+}
 
 const port = process.env.PORT || 8080;
 const wss = new WebSocketServer({ port });
