@@ -75,8 +75,58 @@ function handleMessage(ws, data) {
         case 'spellRemoval':
             handleSpellRemoval(ws, data);
             break;
+        case 'playerReady':
+            handlePlayerReady(ws, data);
         default:
             console.log('🤔 Tipo messaggio sconosciuto:', data.type);
+    }
+}
+
+function handlePlayerReady(ws, data) {
+    const player = connectedPlayers.get(ws);
+    if (!player || player.status !== 'in_game') return;
+    
+    const match = activeMatches.get(player.currentMatch);
+    if (!match || match.matchState !== 'waiting_for_ready') return;
+
+    console.log(`👍 ${player.username} è pronto per il match ${match.id}`);
+
+    const isPlayer1 = match.players[0].id === player.id;
+    
+    if (isPlayer1) {
+        match.player1Ready = true;
+    } else {
+        match.player2Ready = true;
+    }
+
+    // Notifica l'altro giocatore che sei pronto (opzionale, per UI)
+    const opponent = match.players[isPlayer1 ? 1 : 0];
+    if (opponent.ws && opponent.ws.readyState === 1) {
+        opponent.ws.send(JSON.stringify({ type: 'opponentReady' }));
+    }
+
+    // Controlla se entrambi sono pronti
+    if (match.player1Ready && match.player2Ready) {
+        console.log(`🏁 Entrambi i giocatori pronti! Avvio countdown per ${match.id}`);
+        match.matchState = 'starting'; // Cambia stato per evitare doppi click
+
+        // Invia il via libera per il countdown a *entrambi* i giocatori
+        const countdownMessage = JSON.stringify({ type: 'matchStartCountdown' });
+        
+        if (match.players[0].ws && match.players[0].ws.readyState === 1) {
+            match.players[0].ws.send(countdownMessage);
+        }
+        if (match.players[1].ws && match.players[1].ws.readyState === 1) {
+            match.players[1].ws.send(countdownMessage);
+        }
+        
+        // Dopo il countdown (es. 4 sec), il server imposta lo stato "attivo"
+        setTimeout(() => {
+            if (activeMatches.has(match.id)) {
+                 match.matchState = 'active';
+                 console.log(`🟢 Match ${match.id} è ora attivo.`);
+            }
+        }, 4000); // 4 secondi (3 di countdown + 1 buffer)
     }
 }
 
@@ -85,6 +135,7 @@ function handleSpellRemoval(ws, data) {
     if (!player || player.status !== 'in_game') return;
     const match = activeMatches.get(player.currentMatch);
     if (!match) return;
+    if (match.matchState !== 'active') return;
     const isPlayer1 = match.players[0].id === player.id;
     const opponent = match.players[isPlayer1 ? 1 : 0];
     if (opponent && opponent.ws && opponent.ws.readyState === 1) {
@@ -105,6 +156,7 @@ function handleSpellCast(ws, data) {
     if (!player || player.status !== 'in_game') return;
     const match = activeMatches.get(player.currentMatch);
     if (!match) return;
+    if (match.matchState !== 'active') return;
     const isPlayer1 = match.players[0].id === player.id;
     const opponent = match.players[isPlayer1 ? 1 : 0];
     if (opponent && opponent.ws && opponent.ws.readyState === 1) {
@@ -126,6 +178,8 @@ function handlePlayerMove(ws, data) {
 
     const match = activeMatches.get(player.currentMatch);
     if (!match) return;
+
+    if (match.matchState !== 'active') return;
 
     // Determina quale giocatore ha inviato l'azione
     const isPlayer1 = match.players[0].id === player.id;
@@ -166,6 +220,8 @@ function handleProjectileLaunch(ws, data) {
     const match = activeMatches.get(player.currentMatch);
     if (!match) return;
 
+    if (match.matchState !== 'active') return;
+
     // Determina quale giocatore ha inviato l'azione
     const isPlayer1 = match.players[0].id === player.id;
     const opponent = match.players[isPlayer1 ? 1 : 0];
@@ -195,6 +251,8 @@ function handleMagicCircleUpdate(ws, data) {
     const match = activeMatches.get(player.currentMatch);
     if (!match) return;
 
+    if (match.matchState !== 'active') return;
+
     // Determina quale giocatore ha inviato l'azione
     const isPlayer1 = match.players[0].id === player.id;
     const opponent = match.players[isPlayer1 ? 1 : 0];
@@ -215,6 +273,8 @@ function handlePlayerCasting(ws, data) {
 
     const match = activeMatches.get(player.currentMatch);
     if (!match) return;
+
+    if (match.matchState !== 'active') return;
 
     // Determina quale giocatore ha inviato l'azione
     const isPlayer1 = match.players[0].id === player.id;
@@ -237,6 +297,8 @@ function handleProjectileHit(ws, data) {
 
     const match = activeMatches.get(player.currentMatch);
     if (!match) return;
+
+    if (match.matchState !== 'active') return;
 
     // Determina quale giocatore ha inviato l'azione
     const isPlayer1 = match.players[0].id === player.id;
@@ -414,6 +476,9 @@ function createMatch(player1, player2) {
         players: [player1, player2],
         startTime: Date.now(),
         status: 'active', // starting, active, finished
+        player1Ready: false,
+        player2Ready: false,
+        matchState: 'waiting_for_ready',
         gameState: {
             player1: {
                 id: player1.id,

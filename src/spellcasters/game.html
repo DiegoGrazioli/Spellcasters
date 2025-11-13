@@ -11,6 +11,21 @@
 </head>
 <body>
   <!-- <button id="home-btn" class="btn-permanent">Home</button> -->
+  <div id="pre-match-overlay" class="game-overlay hidden">
+    <div id="ready-container">
+      <h2 id="ready-title">Duello Trovato!</h2>
+      <p id="ready-message">Clicca per dichiararti pronto alla battaglia</p>
+      <button id="ready-btn" class="main-btn">Sono Pronto</button>
+    </div>
+    <div id="countdown-container" class="hidden">
+      <h1 id="countdown-text">3</h1>
+    </div>
+  </div>
+  
+  <div id="post-match-overlay" class="game-overlay hidden">
+    <h1 id="match-result-text"></h1>
+    <p>Ritorno all'arena...</p>
+  </div>
   <div id="debug" class="hidden"></div>
   <canvas id="spellCanvas"></canvas>
   <div id="exp-bar-container">

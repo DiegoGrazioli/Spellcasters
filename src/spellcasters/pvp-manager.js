@@ -1,8 +1,9 @@
 // pvp-manager.js - Gestione partite PvP integrata con main.js
 import { VirtualMouseEntity, globalCollisionSystem } from "./collision-system.js";
 import { triggerCameraShake, updateRedOverlay } from './damage-effects.js';
-import { drawProjectilePolygonPattern } from "./element-patterns.js";
+import { drawProjectilePolygonPattern, drawElementPattern } from "./element-patterns.js";
 import { applyElementalHit, statusEffectManager, updateStatusEffects, createElementalDebuffParticles } from './status-effects.js';
+import { audioManager } from './audio-manager.js';
 
 export class PvPManager {
     constructor(gameCanvas, gameContext) {
@@ -61,6 +62,20 @@ export class PvPManager {
 
         this.opponentCircleRotation = 0;
 
+        this.matchState = 'loading';
+
+        this.preMatchOverlay = document.getElementById('pre-match-overlay');
+        this.postMatchOverlay = document.getElementById('post-match-overlay');
+        this.readyBtn = document.getElementById('ready-btn');
+        this.readyContainer = document.getElementById('ready-container');
+        this.readyTitle = document.getElementById('ready-title');
+        this.readyMessage = document.getElementById('ready-message');
+        this.countdownContainer = document.getElementById('countdown-container');
+        this.countdownText = document.getElementById('countdown-text');
+        this.matchResultText = document.getElementById('match-result-text');
+
+        this.countdownCircle = null;
+
         // status effects
         this.playerMovementModifier = { speedMultiplier: 1 };
         this.playerControlInverted = false;
@@ -74,6 +89,205 @@ export class PvPManager {
         this.initializePvP();
 
         this.setupPageUnloadHandler();
+    }
+
+    drawCountdownCircle(ctx) {
+        const circle = this.countdownCircle;
+        if (!circle) return;
+
+        const { x, y, radius, projections, circleRotation, projectionRotation, element } = circle;
+        
+        // Colore base del timer (un blu/ciano standard)
+        const color = element ? this.getElementColor(element) : "#00e0ff";
+        const thickness = 3;
+
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(circleRotation);
+        ctx.translate(-x, -y);
+
+        if (element) {
+            // Usa la funzione che abbiamo importato
+            drawElementPattern(ctx, x, y, radius * 0.82, element);
+        }
+
+        // Cerchi principali
+        ctx.lineWidth = thickness;
+        ctx.strokeStyle = color;
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, 2 * Math.PI);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(x, y, radius + 20, 0, 2 * Math.PI);
+        ctx.stroke();
+
+        // Segmenti radiali
+        ctx.lineWidth = 1;
+        const numSegments = 24;
+        for (let i = 0; i < numSegments; i++) {
+            const angle = (2 * Math.PI / numSegments) * i;
+            const innerX = x + Math.cos(angle) * radius;
+            const innerY = y + Math.sin(angle) * radius;
+            const outerX = x + Math.cos(angle) * (radius + 20);
+            const outerY = y + Math.sin(angle) * (radius + 20);
+            ctx.beginPath();
+            ctx.moveTo(outerX, outerY);
+            ctx.lineTo(innerX, innerY);
+            ctx.stroke();
+        }
+        ctx.restore();
+
+        // Disegna le proiezioni (le "cariche" del countdown)
+        // Usa la funzione già importata in pvp-manager.js
+        if (projections && projections.length > 0) {
+            drawProjectilePolygonPattern(
+                ctx,
+                x,
+                y,
+                radius * 1.2,
+                projections.length,
+                color, // <-- Colore elemento
+                projectionRotation,
+                projections // <-- Tipi di proiezione casuali
+            );
+        }
+    }
+
+    getRandomElement() {
+        const elements = ['fuoco', 'acqua', 'aria', 'terra'];
+        return elements[Math.floor(Math.random() * elements.length)];
+    }
+
+    getRandomProjectionType() {
+        // Tipi di proiezione validi
+        const types = ['proiettile', 'spaziale']; 
+        return types[Math.floor(Math.random() * types.length)];
+    }
+
+    // chiamata da initializePvP
+    setupPreMatchOverlay() {
+        if (!this.preMatchOverlay || !this.readyBtn || !this.readyContainer) {
+            console.error("Elementi UI pre-partita non trovati!");
+            this.matchState = 'active'; // Fallback se l'UI non c'è
+            return;
+        }
+
+        this.matchState = 'waiting_for_ready';
+        this.preMatchOverlay.classList.remove('hidden');
+        this.readyContainer.classList.remove('hidden');
+        this.countdownContainer.classList.add('hidden');
+        
+        this.readyBtn.onclick = () => {
+            // 1. Attiva il contesto audio (da main.js)
+            audioManager.resumeContext();
+            
+            // 2. Richiedi il Pointer Lock (da main.js)
+            this.canvas.requestPointerLock();
+            this.canvas.focus();
+            
+            // 3. Invia "pronto" al server
+            if (this.isConnected) {
+                this.ws.send(JSON.stringify({
+                    type: 'playerReady',
+                    matchId: this.matchData.matchId,
+                    playerRole: this.playerRole
+                }));
+            }
+            
+            // 4. Aggiorna la UI del pulsante
+            this.readyTitle.textContent = 'In attesa dell\'avversario...';
+            this.readyMessage.textContent = 'Preparati alla battaglia!';
+            this.readyBtn.disabled = true;
+            this.readyBtn.textContent = 'Pronto!';
+        };
+    }
+
+    // invia "pronto" al server
+    startCountdown() {
+        if (this.matchState !== 'waiting_for_ready' && this.matchState !== 'starting') return;
+        
+        console.log("Inizio countdown con cerchio magico...");
+        audioManager.playClockSound();
+        this.matchState = 'countdown';
+        
+        if (this.readyContainer) this.readyContainer.classList.add('hidden');
+        
+        if (this.countdownContainer) {
+            this.countdownContainer.classList.remove('hidden');
+            this.countdownContainer.classList.add('transparent-bg');
+        }
+        if (this.countdownText) {
+            this.countdownText.style.display = 'none'; // Nasconde "3"
+        }
+
+        let count = 3;
+
+        // --- NUOVO: Crea proiezioni casuali ---
+        const initialProjections = [];
+        for (let i = 0; i < count; i++) {
+            initialProjections.push(this.getRandomProjectionType());
+        }
+        // --- FINE NUOVO ---
+
+        // Crea l'oggetto per il cerchio del countdown
+        this.countdownCircle = {
+            x: this.canvas.width / 2,
+            y: this.canvas.height / 2,
+            radius: 150,
+            projections: initialProjections,           // <-- MODIFICATO
+            element: this.getRandomElement(),          // <-- NUOVO
+            rotationDirection: 1,                      // <-- NUOVO (per inversione)
+            circleRotation: 0,
+            projectionRotation: 0
+        };
+
+        // --- NUOVO: Camera Shake iniziale ---
+        triggerCameraShake(3, 1000); // Shake leggero per 1 secondo
+
+        const interval = setInterval(() => {
+            count--;
+            
+            if (this.countdownCircle) {
+                // --- NUOVO: Camera Shake a ogni tick ---
+                triggerCameraShake(3, 1000); // Shake leggero per 1 secondo
+
+                // --- NUOVO: Inversione rotazione ---
+                if (count === 2) {
+                    this.countdownCircle.rotationDirection = -1; // Inverti!
+                }
+
+                // Rimuovi una carica (proiezione)
+                if (count > 0) {
+                    this.countdownCircle.projections.pop();
+                    // --- NUOVO: Cambia elemento casuale ---
+                    this.countdownCircle.element = this.getRandomElement();
+                } 
+                // A zero, mostra "DUEL!" e rimuovi l'ultima carica
+                else if (count === 0) {
+                    this.countdownCircle.projections = [];
+                    // --- NUOVO: Cambia elemento casuale (per la scritta DUEL!) ---
+                    this.countdownCircle.element = this.getRandomElement();
+                    
+                    if (this.countdownText) {
+                        this.countdownText.textContent = 'DUEL!';
+                        this.countdownText.style.display = 'block';
+                        this.countdownText.style.animation = 'pulse 0.5s 2';
+                    }
+                } 
+                // A -1, pulisci tutto e inizia la partita
+                else {
+                    audioManager.stopClockSound();
+                    audioManager.playStartSound();
+                    clearInterval(interval);
+                    if (this.preMatchOverlay) this.preMatchOverlay.classList.add('hidden');
+                    this.countdownCircle = null; // Rimuovi il cerchio
+                    this.matchState = 'active'; // <-- PARTITA ATTIVA!
+                    console.log("🟢 Partita attiva!");
+                }
+            } else {
+                 clearInterval(interval); // Sicurezza
+            }
+        }, 1000); // Esattamente ogni secondo
     }
 
     setupStatusEffectCallbacks() {
@@ -164,7 +378,7 @@ export class PvPManager {
             this.opponent.virtualMouse = { x: 200, y: this.canvas.height / 2 };
         }
 
-        
+        this.setupPreMatchOverlay();
 
         // Connetti al server di gioco
         this.connectToGameServer();
@@ -362,6 +576,12 @@ export class PvPManager {
                 break;
             case 'opponentSpellRemoval':
                 this.handleOpponentSpellRemoval(data);
+                break;
+            case 'playerReady':
+                if (this.readyTitle) this.readyTitle.textContent = 'Avversario pronto!';
+                break;
+            case 'matchStartCountdown':
+                this.startCountdown();
                 break;
             case 'error':
                 console.error('❌ Errore server:', data.message);
@@ -713,6 +933,21 @@ export class PvPManager {
 
         this.opponentCircleRotation += 0.003;
         
+        if (this.matchState === 'countdown' && this.countdownCircle) {
+            // Calcola la rotazione per 1 giro al secondo (2*PI radianti in 60 frames)
+            const deltaRotationPerFrame = (2 * Math.PI) / 3600.0;
+            
+            const direction = this.countdownCircle.rotationDirection || 1;
+
+            this.countdownCircle.circleRotation += (deltaRotationPerFrame * direction);
+            // Rotazione opposta e più veloce per le proiezioni, come da richiesta
+            this.countdownCircle.projectionRotation -= (deltaRotationPerFrame * 2 * direction);
+        }
+
+        if (this.matchState !== 'active') {
+            return; 
+        }
+
         // Aggiorna riferimenti ai sistemi di main.js
         this.gameHooks.virtualMouse = gameState.virtualMouse;
         this.gameHooks.projectiles = gameState.projectiles;
@@ -1015,6 +1250,10 @@ export class PvPManager {
     renderPvPElements(ctx) {
         if (!this.isActive()) return;
     
+        if (this.matchState === 'countdown' && this.countdownCircle) {
+            this.drawCountdownCircle(ctx);
+        }
+
         // Disegna avversario con la stessa grafica del player ma rosso
         this.drawOpponent(ctx);
     
@@ -1796,20 +2035,40 @@ export class PvPManager {
     }
 
     async endMatch(won, reason = 'normal') {
+        if (this.matchState === 'finished') return; // Evita doppi trigger
+        this.matchState = 'finished';
+
         let message;
         if (reason === 'forfeit') {
-            message = won ? 'Hai vinto per forfeit dell\'avversario!' : 'Hai perso per forfeit!';
+            message = won ? 'Vittoria per Forfeit' : 'Sconfitta per Forfeit';
         } else if (reason === 'opponent_disconnect') {
-            message = 'Vittoria per disconnessione avversario! 🎉';
+            message = 'Vittoria per Disconnessione';
         } else {
-            message = won ? 'Vittoria! 🎉' : 'Sconfitta! 💀';
+            message = won ? 'Vittoria!' : 'Sconfitta!';
         }
-        alert(message);
+        
+        // alert(message); // <-- RIMOSSO
+        
+        if (this.postMatchOverlay && this.matchResultText) {
+            this.matchResultText.textContent = message;
+            if (won) {
+                this.matchResultText.className = 'victory';
+            } else {
+                this.matchResultText.className = 'defeat';
+            }
+            this.postMatchOverlay.classList.remove('hidden');
+        } else {
+            console.error("Elementi UI post-partita non trovati!");
+            alert(message); // Fallback se l'UI non esiste
+        }
+
         await this.updatePlayerStats(won);
         this.cleanupMatch();
+        
+        // Aumenta il timeout per dare il tempo di leggere il messaggio
         setTimeout(() => {
             window.location.href = 'arena.html';
-        }, 2000);
+        }, 3000); // 3 secondi
     }
 
     cleanupMatch() {

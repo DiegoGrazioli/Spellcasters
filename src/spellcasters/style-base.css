@@ -115,3 +115,74 @@ body.day {
   z-index: 10;
   mix-blend-mode: lighten;
 }
+
+.game-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.85);
+  color: white;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  text-align: center;
+  font-family: "Cinzel", serif;
+  transition: opacity 0.5s ease;
+}
+.game-overlay.hidden {
+  display: none;
+  opacity: 0;
+}
+
+/* Stili per l'overlay pre-partita */
+#ready-container h2 {
+  font-size: 2.5em;
+  margin-bottom: 10px;
+}
+#ready-container p {
+  font-size: 1.2em;
+  margin-bottom: 20px;
+}
+/* Stili per il countdown */
+#countdown-container h1 {
+  font-size: 8em;
+  font-weight: bold;
+  font-family: "Cinzel", serif;
+  animation: pulse 1s infinite;
+}
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+/* Stili per l'overlay post-partita */
+#post-match-overlay h1 {
+  font-size: 5em;
+  font-weight: bold;
+  font-family: "Cinzel", serif;
+  margin-bottom: 20px;
+  transform: scale(0.9);
+  opacity: 0;
+  animation: fadeIn 1s forwards;
+}
+#post-match-overlay h1.victory {
+  color: #4CAF50; /* Verde */
+}
+#post-match-overlay h1.defeat {
+  color: #F44336; /* Rosso */
+}
+@keyframes fadeIn {
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+#countdown-container.transparent-bg {
+  background-color: transparent !important; /* Rende lo sfondo del countdown trasparente */
+}

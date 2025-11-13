@@ -87,8 +87,12 @@ class AudioManager {
             DRAW_38: 'draw_38',
             DRAW_39: 'draw_39',
             DRAW_40: 'draw_40',
+            CLOCK: 'clock_sound',
+            START_1: 'start_1',
+            START_2: 'start_2'
         };
 
+        // localmente devi aggiungere "src/" davanti a sound in ogni path
         // Mappatura dei suoni ai file audio (da aggiornare con i percorsi reali)
         this.soundFiles = {
             // [ES: 'nome_sfx']: 'path/to/audio/file.wav'
@@ -152,7 +156,10 @@ class AudioManager {
             [this.soundTypes.DRAW_37]: '/sound/sfx/draw/untitled - Track 37.wav',
             [this.soundTypes.DRAW_38]: '/sound/sfx/draw/untitled - Track 38.wav',
             [this.soundTypes.DRAW_39]: '/sound/sfx/draw/untitled - Track 39.wav',
-            [this.soundTypes.DRAW_40]: '/sound/sfx/draw/untitled - Track 40.wav'
+            [this.soundTypes.DRAW_40]: '/sound/sfx/draw/untitled - Track 40.wav',
+            [this.soundTypes.CLOCK]: '/sound/sfx/clock.mp3',
+            [this.soundTypes.START_1]: '/sound/sfx/VR_impact_clonk.wav',
+            [this.soundTypes.START_2]: '/sound/sfx/VR_impact_clank.wav'
         };
 
         // Stato specifico per i loop
@@ -162,7 +169,8 @@ class AudioManager {
             [this.soundTypes.SPELL_SPATIAL_FUOCO]: { isPlaying: false, id: null },
             [this.soundTypes.SPELL_SPATIAL_ACQUA]: { isPlaying: false, id: null },
             [this.soundTypes.SPELL_SPATIAL_ARIA]: { isPlaying: false, id: null },
-            [this.soundTypes.SPELL_SPATIAL_TERRA]: { isPlaying: false, id: null }
+            [this.soundTypes.SPELL_SPATIAL_TERRA]: { isPlaying: false, id: null },
+            [this.soundTypes.CLOCK]: { isPlaying: false, id: null },
             // [this.soundTypes.DRAWING_LOOP]: { isPlaying: false, id: null }, // Se implementato come loop
         };
 
@@ -439,6 +447,22 @@ class AudioManager {
     playDrawingSound() {
         const randomSoundType = this.drawingSoundTypes[Math.floor(Math.random() * this.drawingSoundTypes.length)];
         this.playSound(randomSoundType);
+    }
+
+    playClockSound() {
+        this.playSound(this.soundTypes.CLOCK, 0.5); // Volume ridotto
+    }
+
+    stopClockSound() {
+        this.stopSound(this.soundTypes.CLOCK);
+    }
+
+    playStartSound(random = true) {
+        let soundType = this.soundTypes.START_1;
+        if (random) {
+            soundType = Math.random() < 0.5 ? this.soundTypes.START_1 : this.soundTypes.START_2;
+        }
+        this.playSound(soundType, 0.9); // Volume leggermente ridotto
     }
 
     // --- Controllo Generale ---
