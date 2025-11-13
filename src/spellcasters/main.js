@@ -227,30 +227,30 @@ window.addEventListener("keydown", (e) => {
   if (e.key === 'g' || e.key === 'G') setTheme('day');
 
   // 🧪 TEST STATUS EFFECTS
-  // if (e.key === '1') {
-  //   console.log("🔥 Testando effetto FUOCO");
-  //   if (typeof applyElementalHit !== 'undefined') {
-  //     applyElementalHit('fuoco', 'player');
-  //   }
-  // }
-  // if (e.key === '2') {
-  //   console.log("💧 Testando effetto ACQUA (rallentamento)");
-  //   if (typeof applyElementalHit !== 'undefined') {
-  //     applyElementalHit('acqua', 'player');
-  //   }
-  // }
-  // if (e.key === '3') {
-  //   console.log("💨 Testando effetto ARIA (inversione controlli)");
-  //   if (typeof applyElementalHit !== 'undefined') {
-  //     applyElementalHit('aria', 'player');
-  //   }
-  // }
-  // if (e.key === '4') {
-  //   console.log("🗿 Testando effetto TERRA (stun)");
-  //   if (typeof applyElementalHit !== 'undefined') {
-  //     applyElementalHit('terra', 'player');
-  //   }
-  // }
+  if (e.key === '1') {
+    console.log("🔥 Testando effetto FUOCO");
+    if (typeof applyElementalHit !== 'undefined') {
+      applyElementalHit('fuoco', 'player');
+    }
+  }
+  if (e.key === '2') {
+    console.log("💧 Testando effetto ACQUA (rallentamento)");
+    if (typeof applyElementalHit !== 'undefined') {
+      applyElementalHit('acqua', 'player');
+    }
+  }
+  if (e.key === '3') {
+    console.log("💨 Testando effetto ARIA (inversione controlli)");
+    if (typeof applyElementalHit !== 'undefined') {
+      applyElementalHit('aria', 'player');
+    }
+  }
+  if (e.key === '4') {
+    console.log("🗿 Testando effetto TERRA (stun)");
+    if (typeof applyElementalHit !== 'undefined') {
+      applyElementalHit('terra', 'player');
+    }
+  }
 });
 
 window.addEventListener("keyup", (e) => {
@@ -1039,6 +1039,7 @@ function updateAudioState() {
 // === ANIMATE LOOP ===
 export function animate() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.save();
   applyCameraShake(ctx);
   updateVirtualMouse();
   globalCollisionSystem.update();
@@ -1233,6 +1234,7 @@ export function animate() {
   //   infusedProjection = null;
   //   magicCircleToDelete = false;
   // }
+  ctx.restore();
 }
 
 function drawLastProjectileParticles() {
